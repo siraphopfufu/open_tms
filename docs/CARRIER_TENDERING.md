@@ -20,7 +20,7 @@ The tendering system supports **broadcast** (all carriers simultaneously) and **
 
 ## Carrier Portal
 
-- Separate app at `/carrier-portal/` with its own layout and JWT auth (`iss: "open-tms-carrier"`)
+- Separate app at `/carrier-portal/` with its own layout and JWT auth (`iss: "ather-tms-carrier"`)
 - Pages: login, dashboard, tender view with bid form, tender history with win/loss tracking, bid
   history, profile with password change
 - Auth middleware: `authenticateCarrierJWT` in `backend/src/middleware/jwtAuth.ts`

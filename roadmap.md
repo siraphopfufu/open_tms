@@ -1,6 +1,6 @@
-# Open TMS Roadmap
+# Ather TMS Roadmap
 
-> **Reoriented August 2026: the FinnTMS / FinnWMS split.** Open TMS is becoming two products over
+> **Reoriented August 2026: the FinnTMS / FinnWMS split.** Ather TMS is becoming two products over
 > a shared core: **FinnTMS** (transport) and **FinnWMS** (warehouse), with a possible **FinnIMS**
 > (inventory) later. Architecture: modular monolith with build-time product composition, per
 > [ADR 0002](docs/adr/0002-modular-monolith-product-composition.md). The sequenced programme is
@@ -150,7 +150,7 @@ Every TMS needs customer self-service. The carrier portal exists but there's not
 
 - **Customer User Management** ✅
   - CustomerUser model (separate from internal User, same pattern as CarrierUser)
-  - Email/password auth with dedicated JWT issuer (`open-tms-customer`)
+  - Email/password auth with dedicated JWT issuer (`ather-tms-customer`)
   - Password strength validation (8+ chars, uppercase, lowercase, number), 5-attempt lockout (15 min)
   - Admin CRUD at `/api/v1/customers/:customerId/users` (list, create, update, reset-password, deactivate)
 - **Customer Portal App** ✅
@@ -211,7 +211,7 @@ Every TMS needs customer self-service. The carrier portal exists but there's not
     documents and BOL, telemetry, carrier. Financials, activity, SLA, customs and rate
     confirmations are never shareable, enforced server-side on both the write and the read.
   - Recipients enter an email address and the access code at `/share/:token`, which buys a
-    two-hour viewer session scoped to one shipment (`iss: open-tms-share`).
+    two-hour viewer session scoped to one shipment (`iss: ather-tms-share`).
   - Every attempt, granted or denied, is written to the `ShipmentShareAccess` ledger. Five wrong
     codes lock the link for 15 minutes; the public routes are rate limited per IP.
   - New `shipments:share` permission gates issuing, editing, revoking and reading the access log,
@@ -376,7 +376,7 @@ Bolt-on WMS extending the TMS's TrackableUnit/CargoScan/Location models. Full sp
   - LoadPlan model with reverse load-sequence (lines ordered by stop sequence)
   - BOL auto-generated on `load_plan.completed` via DocumentGenerationService
   - Seal capture + dock door assignment on load plan create/complete
-  - BOL readiness gate (#78): a BOL is legally required cargo data, but Open TMS treats that data as optional, so generation is blocked (sync + async endpoints) and the manual "Generate BOL" button greys out until the shipment has a shipper/consignee, attached orders, and every order line item carries a goods description, quantity, and weight. `evaluateBolReadiness` (single source of truth) drives both the API guards and the button state; missing requirements are surfaced inline on the shipment Documents tab
+  - BOL readiness gate (#78): a BOL is legally required cargo data, but Ather TMS treats that data as optional, so generation is blocked (sync + async endpoints) and the manual "Generate BOL" button greys out until the shipment has a shipper/consignee, attached orders, and every order line item carries a goods description, quantity, and weight. `evaluateBolReadiness` (single source of truth) drives both the API guards and the button state; missing requirements are surfaced inline on the shipment Documents tab
   - 4 command handler tests + 6 BOL readiness tests
 - **Cross-dock** DONE
   - When ReceivingTask has crossDock=true, CompleteReceiving skips putaway and sorts directly to staging bins

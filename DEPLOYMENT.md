@@ -1,6 +1,6 @@
-# Open TMS - GCP Deployment Guide
+# Ather TMS - GCP Deployment Guide
 
-This guide will help you deploy the Open TMS application to Google Cloud Platform using Cloud Run and Cloud SQL.
+This guide will help you deploy the Ather TMS application to Google Cloud Platform using Cloud Run and Cloud SQL.
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ This guide will help you deploy the Open TMS application to Google Cloud Platfor
 
 ```bash
 # Create a new project
-gcloud projects create your-project-id --name="Open TMS"
+gcloud projects create your-project-id --name="Ather TMS"
 
 # Set the project
 gcloud config set project your-project-id
@@ -49,13 +49,13 @@ gcloud services enable container.googleapis.com
 
 ```bash
 # Run the database setup script
-./setup-database.sh your-project-id us-central1 open-tms-db
+./setup-database.sh your-project-id us-central1 ather-tms-db
 ```
 
 Or manually:
 
 ```bash
-gcloud sql instances create open-tms-db \
+gcloud sql instances create ather-tms-db \
   --database-version=POSTGRES_15 \
   --tier=db-f1-micro \
   --region=us-central1 \
@@ -68,11 +68,11 @@ gcloud sql instances create open-tms-db \
 
 ```bash
 # Create database
-gcloud sql databases create open_tms --instance=open-tms-db
+gcloud sql databases create ather_tms --instance=ather-tms-db
 
 # Set password for postgres user
 gcloud sql users set-password postgres \
-  --instance=open-tms-db \
+  --instance=ather-tms-db \
   --password=YOUR_SECURE_PASSWORD
 ```
 
@@ -80,10 +80,10 @@ gcloud sql users set-password postgres \
 
 ```bash
 # Get the Cloud SQL connection name
-CONNECTION_NAME=$(gcloud sql instances describe open-tms-db --format='value(connectionName)')
+CONNECTION_NAME=$(gcloud sql instances describe ather-tms-db --format='value(connectionName)')
 
 # Create the DATABASE_URL secret
-echo -n "postgresql://postgres:YOUR_SECURE_PASSWORD@/open_tms?host=/cloudsql/$CONNECTION_NAME" | gcloud secrets create DATABASE_URL --data-file=-
+echo -n "postgresql://postgres:YOUR_SECURE_PASSWORD@/ather_tms?host=/cloudsql/$CONNECTION_NAME" | gcloud secrets create DATABASE_URL --data-file=-
 
 # Verify the secret was created
 gcloud secrets versions access latest --secret=DATABASE_URL
@@ -109,14 +109,14 @@ chmod +x deploy.sh setup-database.sh
 cd backend
 
 # Build and push image
-gcloud builds submit --tag gcr.io/your-project-id/open-tms-backend:latest .
+gcloud builds submit --tag gcr.io/your-project-id/ather-tms-backend:latest .
 
 # Get Cloud SQL connection name
-CLOUD_SQL_CONNECTION=$(gcloud sql instances describe open-tms-db --format='value(connectionName)')
+CLOUD_SQL_CONNECTION=$(gcloud sql instances describe ather-tms-db --format='value(connectionName)')
 
 # Deploy to Cloud Run with database connection
-gcloud run deploy open-tms-backend \
-  --image gcr.io/your-project-id/open-tms-backend:latest \
+gcloud run deploy ather-tms-backend \
+  --image gcr.io/your-project-id/ather-tms-backend:latest \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
@@ -135,11 +135,11 @@ gcloud run deploy open-tms-backend \
 cd frontend
 
 # Build and push image
-gcloud builds submit --tag gcr.io/your-project-id/open-tms-frontend:latest .
+gcloud builds submit --tag gcr.io/your-project-id/ather-tms-frontend:latest .
 
 # Deploy to Cloud Run
-gcloud run deploy open-tms-frontend \
-  --image gcr.io/your-project-id/open-tms-frontend:latest \
+gcloud run deploy ather-tms-frontend \
+  --image gcr.io/your-project-id/ather-tms-frontend:latest \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
@@ -147,7 +147,7 @@ gcloud run deploy open-tms-frontend \
   --memory 512Mi \
   --cpu 1 \
   --max-instances 10 \
-  --set-env-vars VITE_API_URL=https://open-tms-backend-XXXXX-uc.a.run.app
+  --set-env-vars VITE_API_URL=https://ather-tms-backend-XXXXX-uc.a.run.app
 ```
 
 ## Step 4: Configure CI/CD (Optional)
@@ -163,25 +163,25 @@ In your GitHub repository, go to Settings > Secrets and variables > Actions, and
 
 ```bash
 # Create service account
-gcloud iam service-accounts create open-tms-deploy \
-  --display-name="Open TMS Deploy Service Account"
+gcloud iam service-accounts create ather-tms-deploy \
+  --display-name="Ather TMS Deploy Service Account"
 
 # Grant necessary permissions
 gcloud projects add-iam-policy-binding your-project-id \
-  --member="serviceAccount:open-tms-deploy@your-project-id.iam.gserviceaccount.com" \
+  --member="serviceAccount:ather-tms-deploy@your-project-id.iam.gserviceaccount.com" \
   --role="roles/run.admin"
 
 gcloud projects add-iam-policy-binding your-project-id \
-  --member="serviceAccount:open-tms-deploy@your-project-id.iam.gserviceaccount.com" \
+  --member="serviceAccount:ather-tms-deploy@your-project-id.iam.gserviceaccount.com" \
   --role="roles/cloudbuild.builds.editor"
 
 gcloud projects add-iam-policy-binding your-project-id \
-  --member="serviceAccount:open-tms-deploy@your-project-id.iam.gserviceaccount.com" \
+  --member="serviceAccount:ather-tms-deploy@your-project-id.iam.gserviceaccount.com" \
   --role="roles/iam.serviceAccountUser"
 
 # Create and download key
 gcloud iam service-accounts keys create key.json \
-  --iam-account=open-tms-deploy@your-project-id.iam.gserviceaccount.com
+  --iam-account=ather-tms-deploy@your-project-id.iam.gserviceaccount.com
 ```
 
 ## Step 5: Environment Configuration
@@ -196,7 +196,7 @@ The backend also connects to Cloud SQL via `--add-cloudsql-instances` flag.
 
 Example DATABASE_URL format:
 ```bash
-postgresql://postgres:YOUR_PASSWORD@/open_tms?host=/cloudsql/PROJECT_ID:REGION:INSTANCE_NAME
+postgresql://postgres:YOUR_PASSWORD@/ather_tms?host=/cloudsql/PROJECT_ID:REGION:INSTANCE_NAME
 ```
 
 ### 5.2 Frontend Environment Variables
@@ -204,7 +204,7 @@ postgresql://postgres:YOUR_PASSWORD@/open_tms?host=/cloudsql/PROJECT_ID:REGION:I
 Set these in Cloud Run:
 
 ```bash
-VITE_API_URL=https://open-tms-backend-XXXXX-uc.a.run.app
+VITE_API_URL=https://ather-tms-backend-XXXXX-uc.a.run.app
 ```
 
 ## Step 6: Database Migration
@@ -217,10 +217,10 @@ Migrations run automatically when the backend container starts! The `entrypoint.
 
 ```bash
 # Use Cloud SQL Proxy for local migration
-cloud_sql_proxy -instances=your-project-id:us-central1:open-tms-db=tcp:5432
+cloud_sql_proxy -instances=your-project-id:us-central1:ather-tms-db=tcp:5432
 
 # Set DATABASE_URL locally
-export DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/open_tms"
+export DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/ather_tms"
 
 # Run migrations
 cd backend
@@ -233,10 +233,10 @@ npx prisma migrate deploy
 
 ```bash
 # Backend logs
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=open-tms-backend"
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=ather-tms-backend"
 
 # Frontend logs
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=open-tms-frontend"
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=ather-tms-frontend"
 ```
 
 ### 7.2 Monitor Performance
@@ -252,7 +252,7 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 ```bash
 # Map domain to Cloud Run service
 gcloud run domain-mappings create \
-  --service=open-tms-frontend \
+  --service=ather-tms-frontend \
   --domain=your-domain.com \
   --region=us-central1
 ```
@@ -287,13 +287,13 @@ gcloud run domain-mappings create \
 gcloud run services list
 
 # View service details
-gcloud run services describe open-tms-backend --region=us-central1
+gcloud run services describe ather-tms-backend --region=us-central1
 
 # Update service
-gcloud run services update open-tms-backend --region=us-central1
+gcloud run services update ather-tms-backend --region=us-central1
 
 # Delete service
-gcloud run services delete open-tms-backend --region=us-central1
+gcloud run services delete ather-tms-backend --region=us-central1
 ```
 
 ## Cost Optimization

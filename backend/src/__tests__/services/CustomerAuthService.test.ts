@@ -259,7 +259,7 @@ describe('CustomerAuthService', () => {
       const payload = service.verifyToken(token);
 
       expect(payload.customerId).toBe('cust-1');
-      expect(payload.iss).toBe('open-tms-customer');
+      expect(payload.iss).toBe('ather-tms-customer');
     });
 
     it('rejects token with wrong issuer', () => {

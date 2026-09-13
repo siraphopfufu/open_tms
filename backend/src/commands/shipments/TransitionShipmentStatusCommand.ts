@@ -8,7 +8,7 @@ import {
   validateShipmentReadiness,
   SHIPMENT_LIFECYCLE,
   SHIPMENT_FIELD_LABELS,
-} from '@open-tms/shared';
+} from '@ather-tms/shared';
 
 export interface TransitionShipmentStatusPayload {
   id: string;

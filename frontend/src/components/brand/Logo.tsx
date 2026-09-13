@@ -17,11 +17,11 @@ const SIZES = {
 };
 
 /**
- * Canonical Open TMS logo lockup, per marketing/brand-guidelines.html.
+ * Canonical Ather TMS logo lockup, per marketing/brand-guidelines.html.
  *
  * Replaces the legacy Material Icons `hub` glyph used in vnext-layout.tsx
  * and the old sidebar chrome. The mark is the swap-arrows SVG; the wordmark
- * is "Open TMS" with "TMS" in the primary colour.
+ * is "Ather TMS" with "TMS" in the primary colour.
  */
 export function Logo({
   variant = 'default',
@@ -75,7 +75,7 @@ export function Logo({
         <span className={cn(dims.text, wordmarkColor, 'leading-none')}>
           {wordmark ?? (
             <>
-              Open <span className={tmsColor}>TMS</span>
+              Ather <span className={tmsColor}>TMS</span>
             </>
           )}
         </span>

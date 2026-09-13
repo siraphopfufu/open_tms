@@ -11,7 +11,7 @@
  * organisation, so locations are named down to city and country only.
  */
 
-import { ShipmentShareSection } from '@open-tms/shared';
+import { ShipmentShareSection } from '@ather-tms/shared';
 import { ShipmentShareViewRepository } from '../repositories/ShipmentShareRepository.js';
 
 export interface ShipmentShareView {

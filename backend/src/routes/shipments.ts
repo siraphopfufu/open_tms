@@ -14,7 +14,7 @@ import {
   SHIPMENT_LIFECYCLE,
   allowedTransitions,
   validateShipmentReadiness,
-} from '@open-tms/shared';
+} from '@ather-tms/shared';
 import { registerOrgScope } from '../auth/orgScopeMiddleware.js';
 import { requirePermission } from '../middleware/jwtAuth.js';
 import { IOrderConversionService } from '../services/OrderConversionService.js';

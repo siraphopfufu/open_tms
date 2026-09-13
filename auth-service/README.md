@@ -1,6 +1,6 @@
 # Auth Service
 
-Authentication and authorization service for Open TMS. Manages users, roles, sessions, and JWT tokens.
+Authentication and authorization service for Ather TMS. Manages users, roles, sessions, and JWT tokens.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ npm run dev
 |---|---|---|
 | `DATABASE_URL` | — | PostgreSQL connection string (same as backend) |
 | `AUTH_PORT` | `3002` | Port for the auth service |
-| `JWT_SECRET` | `open-tms-dev-secret-change-in-production` | Secret for signing JWTs |
+| `JWT_SECRET` | `ather-tms-dev-secret-change-in-production` | Secret for signing JWTs |
 | `JWT_ACCESS_EXPIRES_IN` | `900` | Access token TTL in seconds (15 min) |
 | `JWT_REFRESH_EXPIRES_IN` | `604800` | Refresh token TTL in seconds (7 days) |
 

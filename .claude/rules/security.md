@@ -28,7 +28,7 @@ Four distinct principals, each with its own guard. **Do not cross the wires.**
 |---|---|---|
 | Internal user | `authenticateJWT` | Admin/operations app |
 | Customer portal user | `authenticateCustomerJWT` | Separate model, separate issuer |
-| Carrier portal user | `authenticateCarrierJWT` | `iss: "open-tms-carrier"`, separate `CarrierUser` model |
+| Carrier portal user | `authenticateCarrierJWT` | `iss: "ather-tms-carrier"`, separate `CarrierUser` model |
 | Machine / API client | `apiKeyAuth` | `x-api-key` or `Authorization: Bearer`, customer-scoped |
 
 - Validate the issuer, not just the signature. A carrier token must not authenticate an admin route.

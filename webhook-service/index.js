@@ -190,7 +190,7 @@ functions.http('webhook', (req, res) => {
 functions.http('health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
-    service: 'open-tms-webhook-service',
+    service: 'ather-tms-webhook-service',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });

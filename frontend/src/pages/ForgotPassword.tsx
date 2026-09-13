@@ -49,7 +49,7 @@ export default function ForgotPassword() {
                 systemName
               ) : (
                 <>
-                  Open <GradientText>TMS</GradientText>
+                  Ather <GradientText>TMS</GradientText>
                 </>
               )}
             </h1>

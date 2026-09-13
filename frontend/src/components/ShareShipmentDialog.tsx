@@ -14,7 +14,7 @@ import {
   SHIPMENT_SHARE_SECTION_LABELS,
   SHIPMENT_SHARE_SECTION_DESCRIPTIONS,
   ShipmentShareSection,
-} from '@open-tms/shared';
+} from '@ather-tms/shared';
 import { API_URL } from '../api';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';

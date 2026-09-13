@@ -21,7 +21,7 @@ import {
   SHARE_LINK_NOT_FOUND,
   SHARE_LINK_ALREADY_REVOKED,
 } from '../commands/shipmentShare/index.js';
-import { SHIPMENT_SHARE_SECTIONS } from '@open-tms/shared';
+import { SHIPMENT_SHARE_SECTIONS } from '@ather-tms/shared';
 
 const MAX_ACCESS_LOG_PAGE_SIZE = 100;
 

@@ -13,8 +13,8 @@ import {
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required in production');
 }
-const JWT_SECRET = process.env.JWT_SECRET || 'open-tms-dev-secret-change-in-production';
-const CARRIER_JWT_ISSUER = 'open-tms-carrier';
+const JWT_SECRET = process.env.JWT_SECRET || 'ather-tms-dev-secret-change-in-production';
+const CARRIER_JWT_ISSUER = 'ather-tms-carrier';
 const TOKEN_EXPIRY_HOURS = 24;
 
 export interface CarrierJWTPayload {
@@ -104,7 +104,7 @@ export class CarrierAuthService implements ICarrierAuthService {
     // Archived or deleted carriers can no longer access the portal.
     const carrierState = (user as any).carrier as { archived?: boolean; deletedAt?: Date | null } | undefined;
     if (carrierState?.deletedAt || carrierState?.archived) {
-      throw new Error('This carrier account is no longer active. Please contact your Open TMS administrator.');
+      throw new Error('This carrier account is no longer active. Please contact your Ather TMS administrator.');
     }
 
     if (!user.active) throw new Error('Account is deactivated');

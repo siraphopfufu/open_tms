@@ -1,4 +1,4 @@
-# Open TMS - GCP Infrastructure as Code
+# Ather TMS - GCP Infrastructure as Code
 # This Terraform configuration creates all necessary GCP resources
 
 terraform {
@@ -37,7 +37,7 @@ variable "environment" {
 
 # Local values
 locals {
-  service_name = "open-tms"
+  service_name = "ather-tms"
   common_labels = {
     project     = local.service_name
     environment = var.environment

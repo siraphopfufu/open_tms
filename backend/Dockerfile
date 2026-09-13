@@ -1,6 +1,6 @@
 # Backend Dockerfile
 # Build context must be the repository root (npm workspaces monorepo), e.g.:
-#   docker build -f backend/Dockerfile -t open-tms-backend .
+#   docker build -f backend/Dockerfile -t ather-tms-backend .
 FROM public.ecr.aws/docker/library/node:20-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* .npmrc* ./

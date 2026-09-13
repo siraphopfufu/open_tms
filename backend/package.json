@@ -1,5 +1,5 @@
 {
-  "name": "@open-tms/backend",
+  "name": "@ather-tms/backend",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -21,7 +21,7 @@
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/swagger": "^8.14.0",
     "@fastify/swagger-ui": "^1.0.0",
-    "@open-tms/shared": "^0.1.0",
+    "@ather-tms/shared": "^0.1.0",
     "@prisma/client": "^5.22.0",
     "exceljs": "^4.4.0",
     "fastify": "^4.28.1",

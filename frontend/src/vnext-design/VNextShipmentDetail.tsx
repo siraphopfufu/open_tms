@@ -115,7 +115,7 @@ import {
   SHIPMENT_FIELD_LABELS,
   SHIPMENT_EVENT_TYPES,
   shipmentEventLabel,
-} from '@open-tms/shared';
+} from '@ather-tms/shared';
 
 const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   dryVan: 'Dry van',

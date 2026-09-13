@@ -2,7 +2,7 @@
 
 The sequenced plan for separating WMS from TMS so each can ship as its own product, per
 [ADR 0002](../adr/0002-modular-monolith-product-composition.md) (modular monolith, build-time
-product composition). Announced in the `open-tms-is-changing` article.
+product composition). Announced in the `ather-tms-is-changing` article.
 
 **Governing rule: the product runs and ships at the end of every PR.** All schema work is
 expand then contract. Sizing: 1 chunk = one focused PR (one GitHub issue, one worktree).

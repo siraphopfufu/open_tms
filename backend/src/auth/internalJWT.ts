@@ -1,5 +1,5 @@
 /**
- * Shared JWT signing for the internal / "open-tms-auth" token family.
+ * Shared JWT signing for the internal / "ather-tms-auth" token family.
  *
  * The existing `AuthService.generateToken` and the new
  * `WarehouseService` login paths both need to mint tokens that
@@ -13,9 +13,9 @@ import { createHmac } from 'crypto';
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required in production');
 }
-const JWT_SECRET = process.env.JWT_SECRET || 'open-tms-dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'ather-tms-dev-secret-change-in-production';
 
-export const INTERNAL_JWT_ISSUER = 'open-tms-auth';
+export const INTERNAL_JWT_ISSUER = 'ather-tms-auth';
 export const INTERNAL_JWT_DEFAULT_TTL_HOURS = 12;
 
 export interface InternalJWTClaims {
@@ -37,7 +37,7 @@ export interface InternalJWTClaims {
 
 /**
  * Sign a JWT with the same shape as the rest of the internal auth
- * family (HS256, `open-tms-auth` issuer, configurable TTL). The token
+ * family (HS256, `ather-tms-auth` issuer, configurable TTL). The token
  * is accepted by `authenticateJWT` and decorates `req.user` exactly the
  * same way as an `AuthService` login.
  */

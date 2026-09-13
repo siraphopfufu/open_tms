@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Open TMS Local Development Run Script
+# Ather TMS Local Development Run Script
 # Starts database in Docker, applies migrations, and runs backend/frontend from code
 
 set -e
@@ -81,7 +81,7 @@ fi
 # Start database
 info "Starting database container..."
 cd "$(dirname "$0")"
-CONTAINER_NAME="open-tms-db"
+CONTAINER_NAME="ather-tms-db"
 
 if [ ! -z "$DOCKER_COMPOSE_CMD" ]; then
     # Use docker compose
@@ -109,7 +109,7 @@ else
             -e POSTGRES_PASSWORD=$DB_PASSWORD \
             -e POSTGRES_DB=$DB_NAME \
             -p ${DB_PORT}:5432 \
-            -v open-tms-db-data:/var/lib/postgresql/data \
+            -v ather-tms-db-data:/var/lib/postgresql/data \
             postgres:16-alpine
     fi
     DB_CONTAINER_ID=$(docker ps -q -f name=$CONTAINER_NAME)
@@ -250,7 +250,7 @@ fi
 # Success message
 echo ""
 success "=========================================="
-success "Open TMS is running!"
+success "Ather TMS is running!"
 success "=========================================="
 echo ""
 info "Backend API:  http://localhost:${BACKEND_PORT}"

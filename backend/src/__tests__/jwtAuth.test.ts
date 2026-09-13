@@ -1,7 +1,7 @@
 import { createHmac } from 'crypto';
 import { authenticateJWT, requirePermission, optionalAuth } from '../middleware/jwtAuth';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'open-tms-dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'ather-tms-dev-secret-change-in-production';
 
 function makeToken(payload: Record<string, any>, secret = JWT_SECRET): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
@@ -35,7 +35,7 @@ describe('jwtAuth', () => {
         roles: ['admin'],
         permissions: ['*'],
         exp: Math.floor(Date.now() / 1000) + 3600,
-        iss: 'open-tms-auth',
+        iss: 'ather-tms-auth',
       };
       const token = makeToken(payload);
       const req = mockReq(`Bearer ${token}`);
@@ -104,7 +104,7 @@ describe('jwtAuth', () => {
       permissions: ['wms:*', 'shipments:read', 'shipments:write'],
       scope: 'warehouse',
       exp: Math.floor(Date.now() / 1000) + 3600,
-      iss: 'open-tms-auth',
+      iss: 'ather-tms-auth',
     };
 
     it.each([

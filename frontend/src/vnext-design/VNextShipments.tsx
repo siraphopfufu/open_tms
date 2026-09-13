@@ -26,7 +26,7 @@ import {
 import { toast } from 'sonner';
 
 import { API_URL } from '../api';
-import { SHIPMENT_LIFECYCLE, SHIPMENT_STATUS_LABELS } from '@open-tms/shared';
+import { SHIPMENT_LIFECYCLE, SHIPMENT_STATUS_LABELS } from '@ather-tms/shared';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';

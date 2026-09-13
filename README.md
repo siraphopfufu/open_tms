@@ -1,4 +1,4 @@
-# 🚛 Open TMS
+# 🚛 Ather TMS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -14,7 +14,7 @@ This is in active development without a release version yet! When stable I'll ta
 
 ## Contributing
 
-Open TMS is under active development. We welcome contributions — feature requests, bug reports, code, and documentation improvements are all appreciated.
+Ather TMS is under active development. We welcome contributions — feature requests, bug reports, code, and documentation improvements are all appreciated.
 
 See the [Contributing Guide](./CONTRIBUTING.md) for details, and the [Roadmap](./roadmap.md) for what's planned.
 
@@ -22,7 +22,7 @@ See the [Contributing Guide](./CONTRIBUTING.md) for details, and the [Roadmap](.
 
 ## Deploy
 
-Deploy your own Open TMS instance with one click:
+Deploy your own Ather TMS instance with one click:
 
 | Provider | Deploy | What you get |
 |----------|--------|--------------|
@@ -35,7 +35,7 @@ Deploy your own Open TMS instance with one click:
 
 > **AWS note:** Upload `cloudformation.yaml` to an S3 bucket, then use the [Launch Stack](https://console.aws.amazon.com/cloudformation/home#/stacks/new) wizard — or deploy via CLI:
 > ```bash
-> aws cloudformation create-stack --stack-name open-tms \
+> aws cloudformation create-stack --stack-name ather-tms \
 >   --template-body file://cloudformation.yaml \
 >   --parameters ParameterKey=DBPassword,ParameterValue=YourSecurePassword123 \
 >   --capabilities CAPABILITY_IAM
@@ -304,9 +304,9 @@ Simple containerized deployment:
 docker compose up --build -d
 
 # Or build individual services
-docker build -t open-tms-backend ./backend
-docker build -t open-tms-frontend ./frontend
-docker build -t open-tms-auth ./auth-service
+docker build -t ather-tms-backend ./backend
+docker build -t ather-tms-frontend ./frontend
+docker build -t ather-tms-auth ./auth-service
 ```
 
 > **Note**: The auth-service is not yet included in `docker-compose.yml`. Build and run it separately with:
@@ -314,7 +314,7 @@ docker build -t open-tms-auth ./auth-service
 > docker run -d -p 3002:3002 \
 >   -e DATABASE_URL=postgres://tms:tms@host.docker.internal:55432/tms \
 >   -e JWT_SECRET=your-secret \
->   open-tms-auth
+>   ather-tms-auth
 > ```
 
 ### 🔧 Running Workers
@@ -421,7 +421,7 @@ The backend includes a pluggable email service. By default it uses a console pro
 | `SMTP_USER` | — | SMTP authentication username |
 | `SMTP_PASSWORD` | — | SMTP authentication password |
 | `EMAIL_FROM_ADDRESS` | `noreply@opentms.local` | Default sender address |
-| `EMAIL_FROM_NAME` | `Open TMS` | Default sender display name |
+| `EMAIL_FROM_NAME` | `Ather TMS` | Default sender display name |
 
 Email settings can also be managed per-organization via the Admin UI or the `PUT /api/v1/email/settings` endpoint.
 
@@ -433,7 +433,7 @@ The auth-service runs as a standalone Fastify service on port 3002.
 |----------|---------|-------------|
 | `DATABASE_URL` | — | PostgreSQL connection string (shared with backend) |
 | `AUTH_PORT` | `3002` | Port for the auth service |
-| `JWT_SECRET` | `open-tms-dev-secret-change-in-production` | Secret for signing JWTs |
+| `JWT_SECRET` | `ather-tms-dev-secret-change-in-production` | Secret for signing JWTs |
 | `JWT_ACCESS_EXPIRES_IN` | `900` | Access token TTL in seconds (15 min) |
 | `JWT_REFRESH_EXPIRES_IN` | `604800` | Refresh token TTL in seconds (7 days) |
 | `AUTH_SERVICE_URL` | `http://localhost:3002` | Base URL for OAuth callbacks |
@@ -942,7 +942,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Marketing Site
 
-The `www/` directory contains the Open TMS marketing and landing page — a standalone React + Vite + Tailwind CSS site deployable to Firebase Hosting (or any static host).
+The `www/` directory contains the Ather TMS marketing and landing page — a standalone React + Vite + Tailwind CSS site deployable to Firebase Hosting (or any static host).
 
 ```bash
 cd www

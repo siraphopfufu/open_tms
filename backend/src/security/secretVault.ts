@@ -12,7 +12,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 
 const PREFIX = 'v1:';
-const DEV_FALLBACK = 'open-tms-dev-credentials-key-change-me';
+const DEV_FALLBACK = 'ather-tms-dev-credentials-key-change-me';
 
 function resolveKey(): Buffer {
   const raw = process.env.CREDENTIALS_ENCRYPTION_KEY;

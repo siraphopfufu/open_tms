@@ -47,7 +47,7 @@ export function Logo({
   return (
     <span className={cn('inline-flex items-center gap-3 font-bold tracking-tight', className)}>
       <span className={markClasses} aria-hidden>
-        {/* Canonical Open TMS swap-arrows mark */}
+        {/* Canonical Ather TMS swap-arrows mark */}
         <svg
           className={dims.icon}
           fill="none"
@@ -64,7 +64,7 @@ export function Logo({
       </span>
       {showWordmark && (
         <span className={cn(dims.text, wordmarkColor, 'leading-none')}>
-          Open <span className={tmsColor}>TMS</span>
+          Ather <span className={tmsColor}>TMS</span>
         </span>
       )}
     </span>

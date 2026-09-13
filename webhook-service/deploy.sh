@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Open TMS Webhook Service Deployment Script
+# Ather TMS Webhook Service Deployment Script
 # This script deploys the webhook service to Google Cloud Functions
 
 set -e
 
-echo "🚀 Deploying Open TMS Webhook Service to Google Cloud Functions..."
+echo "🚀 Deploying Ather TMS Webhook Service to Google Cloud Functions..."
 
 # Check if gcloud is installed
 if ! command -v gcloud &> /dev/null; then
@@ -21,7 +21,7 @@ if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | head -n
 fi
 
 # Set default values
-FUNCTION_NAME="open-tms-webhook"
+FUNCTION_NAME="ather-tms-webhook"
 REGION="us-central1"
 MEMORY="256MB"
 TIMEOUT="60s"

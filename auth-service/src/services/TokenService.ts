@@ -29,7 +29,7 @@ export class TokenService implements ITokenService {
   private readonly refreshExpiresIn: number; // seconds
 
   constructor() {
-    this.accessSecret = process.env.JWT_SECRET || 'open-tms-dev-secret-change-in-production';
+    this.accessSecret = process.env.JWT_SECRET || 'ather-tms-dev-secret-change-in-production';
     this.accessExpiresIn = Number(process.env.JWT_ACCESS_EXPIRES_IN || 900); // 15 minutes
     this.refreshExpiresIn = Number(process.env.JWT_REFRESH_EXPIRES_IN || 604800); // 7 days
   }
@@ -37,8 +37,8 @@ export class TokenService implements ITokenService {
   generateTokenPair(payload: JWTPayload): TokenPair {
     const accessToken = jwt.sign(payload, this.accessSecret, {
       expiresIn: this.accessExpiresIn,
-      issuer: 'open-tms-auth',
-      audience: 'open-tms',
+      issuer: 'ather-tms-auth',
+      audience: 'ather-tms',
     });
 
     const refreshToken = this.generateRefreshToken();
@@ -54,8 +54,8 @@ export class TokenService implements ITokenService {
 
   verifyAccessToken(token: string): JWTPayload {
     const decoded = jwt.verify(token, this.accessSecret, {
-      issuer: 'open-tms-auth',
-      audience: 'open-tms',
+      issuer: 'ather-tms-auth',
+      audience: 'ather-tms',
     });
     return decoded as JWTPayload;
   }

@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Open TMS has **structural multi-tenancy gaps**. The `Organization` model exists, JWTs carry `organizationId`, and 22+ tables (read models, financials, issues, agent infra) have an `orgId` column that's enforced. But **7 core entities have no `orgId` column at all** — `Customer`, `Carrier`, `Shipment`, `TradingPartner`, `ApiKey`, `Order`, `Rma` — and several routes either don't filter on `orgId` even when the column exists, or fall back to `prisma.organization.findFirst()` instead of using the JWT.
+Ather TMS has **structural multi-tenancy gaps**. The `Organization` model exists, JWTs carry `organizationId`, and 22+ tables (read models, financials, issues, agent infra) have an `orgId` column that's enforced. But **7 core entities have no `orgId` column at all** — `Customer`, `Carrier`, `Shipment`, `TradingPartner`, `ApiKey`, `Order`, `Rma` — and several routes either don't filter on `orgId` even when the column exists, or fall back to `prisma.organization.findFirst()` instead of using the JWT.
 
 The result is a system that's **mid-migration to multi-tenancy**, with real cross-tenant data leaks today. This document inventories the gaps and proposes a phased fix.
 
@@ -179,12 +179,12 @@ As part of the remediation work that produced this document:
 
 ### Phase 7 (this round) — warehouse PWA per-tenant auth
 - **Root cause confirmed**: `WarehouseService.validateMagicLink` and `passwordLogin` returned a `user` payload but **no session token at all**. Every operational warehouse route was running unauthenticated, and the standard `registerOrgScope` was silently picking the default Organization for whoever happened to call.
-- **Shared JWT helper** [auth/internalJWT.ts](backend/src/auth/internalJWT.ts) — `signInternalJWT(claims, ttlHours?)` produces tokens with the same shape as `AuthService.generateToken` (HS256, `open-tms-auth` issuer). The existing `authenticateJWT` middleware accepts them as-is — no new verifier needed.
+- **Shared JWT helper** [auth/internalJWT.ts](backend/src/auth/internalJWT.ts) — `signInternalJWT(claims, ttlHours?)` produces tokens with the same shape as `AuthService.generateToken` (HS256, `ather-tms-auth` issuer). The existing `authenticateJWT` middleware accepts them as-is — no new verifier needed.
 - **Warehouse login flows now mint a session token** ([WarehouseService.ts](backend/src/services/WarehouseService.ts)) — both `validateMagicLink` and `passwordLogin` return `{ token, user }`. `LoginResult.token` is documented as the value to send in the `Authorization: Bearer …` header on every subsequent warehouse request.
 - **Warehouse plugin preHandler** ([warehouse.ts](backend/src/routes/warehouse.ts)) — a single plugin-level hook runs `authenticateJWT` on every route except an allow-list of three login endpoints (`/auth/magic-link/generate`, `/auth/magic-link/validate`, `/auth/login`). After auth fires, `req.user.organizationId` flows through the standard `registerOrgScope` chain that was already wired up, so `req.orgId` is now driven by the JWT instead of falling back to the default Organization on every call.
 - **Tests** (+13):
   - 7 in [internalJWT.test.ts](backend/src/__tests__/auth/internalJWT.test.ts) cover the JWT shape — 3 segments, HS256 header, every claim makes it into the payload, iat/exp/iss correctness, custom TTL, signature verifies against `JWT_SECRET`, optional claims are correctly omitted.
-  - 2 added to [WarehouseService.test.ts](backend/src/__tests__/services/WarehouseService.test.ts) assert both login paths return a valid `open-tms-auth` JWT whose payload includes the right sub, organizationId, and roles.
+  - 2 added to [WarehouseService.test.ts](backend/src/__tests__/services/WarehouseService.test.ts) assert both login paths return a valid `ather-tms-auth` JWT whose payload includes the right sub, organizationId, and roles.
 
 ### What's left (Phase 8+)
 - **Admin role check on `/warehouse/auth/magic-link/generate`** — left allow-listed (unauthed) in this round for back-compat. Should require an admin-role JWT before the next deploy.

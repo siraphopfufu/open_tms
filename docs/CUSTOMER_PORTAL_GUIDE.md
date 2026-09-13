@@ -1,6 +1,6 @@
 # Customer Portal Guide
 
-This guide describes everything a logged-in customer can see and do inside Open TMS today. It is written for product, support, and onboarding - if you need to explain "what does my customer get?" this is the source of truth.
+This guide describes everything a logged-in customer can see and do inside Ather TMS today. It is written for product, support, and onboarding - if you need to explain "what does my customer get?" this is the source of truth.
 
 For the headless integration path (API keys + JSON), see [CUSTOMER_API_GUIDE.md](./CUSTOMER_API_GUIDE.md). For the developer sub-app inside the portal (webhooks, EDI setup, integration logs), see the [Developer App](#developer-app) section below.
 
@@ -26,7 +26,7 @@ For the headless integration path (API keys + JSON), see [CUSTOMER_API_GUIDE.md]
 
 ## Overview
 
-The Customer Portal is a self-service web app for the customers (shippers) that Open TMS moves freight for. It sits at `/customer-portal` and is a separate auth realm from internal TMS staff and from carrier portal users - customers cannot see internal operations data, other customers' shipments, or carrier-only tender pricing.
+The Customer Portal is a self-service web app for the customers (shippers) that Ather TMS moves freight for. It sits at `/customer-portal` and is a separate auth realm from internal TMS staff and from carrier portal users - customers cannot see internal operations data, other customers' shipments, or carrier-only tender pricing.
 
 Three logical surfaces are exposed:
 
@@ -64,7 +64,7 @@ The role split is enforced today by route-level convention; future role-specific
 
 - Login page: `/customer-portal/login`.
 - Endpoint: `POST /api/v1/customer-portal/login` returns `{ token, user }`.
-- Token: HS256-signed JWT, 24-hour expiry, issuer `open-tms-customer`.
+- Token: HS256-signed JWT, 24-hour expiry, issuer `ather-tms-customer`.
 - Persistence: the token + user payload are mirrored to both `localStorage` and a `SameSite=Lax` cookie on the same domain. The cookie is a fallback so the session survives `localStorage` getting wiped in private mode, by ITP, or by browser extensions. Auth is still carried via the `Authorization: Bearer <jwt>` header on every API call - the cookie is not consumed by the backend.
 - Lockout: 5 failed attempts -> 15 minute lockout (`backend/src/services/CustomerAuthService.ts`).
 - Logout: clears both `localStorage` and the cookie, then redirects to `/customer-portal/login`.
@@ -193,7 +193,7 @@ There is no self-service email change today - that goes through internal staff.
 
 Path: `/customer-portal/developer` (sub-app within the same portal session)
 
-The developer sub-app is for customers who want to integrate Open TMS into their own systems. It uses the same customer login and the same scoping rules.
+The developer sub-app is for customers who want to integrate Ather TMS into their own systems. It uses the same customer login and the same scoping rules.
 
 | Page | Path | What it does |
 |---|---|---|

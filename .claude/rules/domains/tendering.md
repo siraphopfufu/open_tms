@@ -25,7 +25,7 @@ Opening a tender triggers outbound EDI 204 via `OutboundEdiDeliveryService`.
 ## Carrier auth is a separate identity system
 
 `CarrierUser` is **not** the internal `User` model. The carrier portal is a separate app at
-`/carrier-portal/` with its own layout and JWT (`iss: "open-tms-carrier"`), authenticated by
+`/carrier-portal/` with its own layout and JWT (`iss: "ather-tms-carrier"`), authenticated by
 `authenticateCarrierJWT` in `backend/src/middleware/jwtAuth.ts`.
 
 - Org scope comes from `attachOrgScopeFromCarrierUserHook` — see the multi-tenancy rule

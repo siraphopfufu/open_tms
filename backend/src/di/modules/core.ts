@@ -133,7 +133,7 @@ export function registerCoreDependencies(prisma: PrismaClient): void {
         user: process.env.SMTP_USER || '',
         password: process.env.SMTP_PASSWORD || '',
         fromEmail: process.env.EMAIL_FROM_ADDRESS || 'noreply@opentms.local',
-        fromName: process.env.EMAIL_FROM_NAME || 'Open TMS',
+        fromName: process.env.EMAIL_FROM_NAME || 'Ather TMS',
       });
     });
   } else {

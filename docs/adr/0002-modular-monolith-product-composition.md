@@ -2,12 +2,12 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-16
-- **Relates to:** the split announced in the `open-tms-is-changing` article
+- **Relates to:** the split announced in the `ather-tms-is-changing` article
   (`www/src/content/articles.ts`), `docs/roadmap/split-finntms-finnwms.md`
 
 ## Context
 
-Open TMS is splitting into distinct products: **FinnTMS** (transport) and **FinnWMS** (warehouse),
+Ather TMS is splitting into distinct products: **FinnTMS** (transport) and **FinnWMS** (warehouse),
 with a possible **FinnIMS** (inventory) later. At least one real prospect wants only
 WMS + Inventory + Issues, so standalone WMS installs must be possible. The codebase is a single
 Fastify/Prisma backend (~150 models, one schema) and a single React SPA, maintained by one person

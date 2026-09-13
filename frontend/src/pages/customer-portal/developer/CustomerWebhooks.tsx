@@ -181,7 +181,7 @@ export default function CustomerWebhooks() {
                   id="hook-url"
                   value={form.url}
                   onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
-                  placeholder="https://yourdomain.com/webhooks/open-tms"
+                  placeholder="https://yourdomain.com/webhooks/ather-tms"
                 />
               </div>
             </div>

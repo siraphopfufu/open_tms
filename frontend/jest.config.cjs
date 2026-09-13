@@ -23,7 +23,7 @@ module.exports = {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
     // packages/shared ships ESM-only output; point tests at the TS source instead
     // so ts-jest compiles it inline rather than requiring the built ESM dist.
-    '^@open-tms/shared$': '<rootDir>/../packages/shared/src/index.ts',
+    '^@ather-tms/shared$': '<rootDir>/../packages/shared/src/index.ts',
     // The app's '@/' alias, mirroring vite.config.ts. Without it no component importing a
     // shadcn primitive can be tested at all.
     '^@/(.*)$': '<rootDir>/src/$1',

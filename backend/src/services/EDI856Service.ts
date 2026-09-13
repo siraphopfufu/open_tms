@@ -83,7 +83,7 @@ export class EDI856Service {
    * Generate EDI 856 document from shipment data using node-x12
    */
   generateEDI856(shipment: ShipmentData, config: EDI856Config = {}): string {
-    const senderId = config.senderId || 'OPEN_TMS';
+    const senderId = config.senderId || 'ATHER_TMS';
     const receiverId = config.receiverId || 'TRADING_PARTNER';
     const interchangeControlNumber = config.interchangeControlNumber || this.generateControlNumber();
     const groupControlNumber = this.generateControlNumber();

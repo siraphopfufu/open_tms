@@ -154,6 +154,6 @@ describe('ShipmentShareService', () => {
       Buffer.from(session.token.split('.')[1], 'base64url').toString()
     );
     expect(payload.sections).toEqual(['overview']);
-    expect(payload.iss).toBe('open-tms-share');
+    expect(payload.iss).toBe('ather-tms-share');
   });
 });

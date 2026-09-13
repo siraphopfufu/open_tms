@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 import { API_URL } from '../api';
-import { SHIPMENT_FIELD_LABELS } from '@open-tms/shared';
+import { SHIPMENT_FIELD_LABELS } from '@ather-tms/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

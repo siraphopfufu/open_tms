@@ -197,7 +197,7 @@ export async function edi180Routes(server: FastifyInstance) {
       expectedReturnDate: body.expectedReturnDate ? new Date(body.expectedReturnDate) : undefined,
       transactionPurpose: '11', // Response to customer request
       receiver: {
-        name: org?.name ?? 'Open TMS',
+        name: org?.name ?? 'Ather TMS',
         address1: order?.origin?.address1,
         city: order?.origin?.city,
         state: order?.origin?.state ?? undefined,

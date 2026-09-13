@@ -1,5 +1,5 @@
 /**
- * Permission constants for the Open TMS RBAC system.
+ * Permission constants for the Ather TMS RBAC system.
  *
  * Format: "resource:action"
  * Wildcards: "*" (all permissions), "resource:*" (all actions on resource)

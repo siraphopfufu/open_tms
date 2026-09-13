@@ -1,6 +1,6 @@
-# Self-hosting Open TMS
+# Self-hosting Ather TMS
 
-How to run Open TMS on a single server you control, with no managed services. If you would rather
+How to run Ather TMS on a single server you control, with no managed services. If you would rather
 use a cloud platform, the Deploy table in the [README](../README.md) has one-click options for
 DigitalOcean, Azure, Google Cloud and AWS.
 
@@ -76,9 +76,9 @@ Any S3-compatible endpoint works. With MinIO on the same host, bind it to localh
 bucket, and issue a scoped credential rather than using the root one:
 
 ```bash
-mc mb local/open-tms
-mc admin user add local open-tms-storage YOUR_SECRET
-mc admin policy attach local readwrite --user open-tms-storage
+mc mb local/ather-tms
+mc admin user add local ather-tms-storage YOUR_SECRET
+mc admin policy attach local readwrite --user ather-tms-storage
 ```
 
 File storage is what backs uploads, generated documents and proof-of-delivery images. If you leave
@@ -106,7 +106,7 @@ JWT_SECRET=
 CREDENTIALS_ENCRYPTION_KEY=
 
 S3_ENDPOINT=http://127.0.0.1:9000
-S3_BUCKET=open-tms
+S3_BUCKET=ather-tms
 S3_REGION=us-east-1
 S3_FORCE_PATH_STYLE=true
 S3_ACCESS_KEY_ID=
@@ -132,7 +132,7 @@ Run the API under systemd so it restarts on failure and starts at boot.
 
 ```ini
 [Unit]
-Description=Open TMS API
+Description=Ather TMS API
 After=network-online.target postgresql.service
 Requires=postgresql.service
 

@@ -1,6 +1,6 @@
-# 🚀 Open TMS - GCP Deployment
+# 🚀 Ather TMS - GCP Deployment
 
-Complete deployment setup for Open TMS on Google Cloud Platform using Cloud Run and Cloud SQL.
+Complete deployment setup for Ather TMS on Google Cloud Platform using Cloud Run and Cloud SQL.
 
 ## 📋 Quick Start
 
@@ -11,20 +11,20 @@ Complete deployment setup for Open TMS on Google Cloud Platform using Cloud Run 
 gcloud config set project your-project-id
 
 # 2. Set up Cloud SQL database
-gcloud sql instances create open-tms-db \
+gcloud sql instances create ather-tms-db \
   --database-version=POSTGRES_15 \
   --tier=db-f1-micro \
   --region=us-central1
 
-gcloud sql databases create open_tms --instance=open-tms-db
+gcloud sql databases create ather_tms --instance=ather-tms-db
 
 gcloud sql users set-password postgres \
-  --instance=open-tms-db \
+  --instance=ather-tms-db \
   --password=YOUR_SECURE_PASSWORD
 
 # 3. Create DATABASE_URL secret
-CONNECTION_NAME=$(gcloud sql instances describe open-tms-db --format='value(connectionName)')
-echo -n "postgresql://postgres:YOUR_PASSWORD@/open_tms?host=/cloudsql/$CONNECTION_NAME" | gcloud secrets create DATABASE_URL --data-file=-
+CONNECTION_NAME=$(gcloud sql instances describe ather-tms-db --format='value(connectionName)')
+echo -n "postgresql://postgres:YOUR_PASSWORD@/ather_tms?host=/cloudsql/$CONNECTION_NAME" | gcloud secrets create DATABASE_URL --data-file=-
 
 # 4. Deploy the application
 ./deploy.sh your-project-id us-central1
@@ -165,11 +165,11 @@ Migrations run automatically on deployment via the backend's `entrypoint.sh` scr
 To run manually:
 ```bash
 # Use Cloud SQL Proxy
-cloud_sql_proxy -instances=PROJECT_ID:REGION:open-tms-db=tcp:5432
+cloud_sql_proxy -instances=PROJECT_ID:REGION:ather-tms-db=tcp:5432
 
 # Run migrations
 cd backend
-export DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5432/open_tms"
+export DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5432/ather_tms"
 npx prisma migrate deploy
 ```
 
@@ -202,7 +202,7 @@ gcloud run services list
 gcloud logging read "resource.type=cloud_run_revision"
 
 # Update service
-gcloud run services update open-tms-backend --region=us-central1
+gcloud run services update ather-tms-backend --region=us-central1
 ```
 
 ## 📞 Support

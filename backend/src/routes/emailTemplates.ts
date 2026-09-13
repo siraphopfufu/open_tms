@@ -200,7 +200,7 @@ export async function emailTemplateRoutes(server: FastifyInstance) {
 
     const themeConfig = org?.themeConfig as Record<string, string> | null;
     const branding = {
-      orgName: org?.name || 'Open TMS',
+      orgName: org?.name || 'Ather TMS',
       primaryColor: themeConfig?.['primary'] || '#1976d2',
       emailHeaderHtml: org?.emailHeaderHtml || undefined,
       emailFooterHtml: org?.emailFooterHtml || undefined,

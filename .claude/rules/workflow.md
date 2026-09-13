@@ -40,7 +40,7 @@ e.g. `TMS: cutoff risk issues don't auto-resolve on recovery`, `WMS: pack audit 
 gh auth status                                  # verify auth first
 gh issue list --label TMS
 gh issue create --title "TMS: ..." --body "..."
-gh issue edit 412 --add-project "Open TMS"
+gh issue edit 412 --add-project "Ather TMS"
 gh pr create --title "Fix cutoff auto-resolve (#412)" --body "..."
 gh pr checks --watch
 gh pr merge --squash --delete-branch
@@ -88,7 +88,7 @@ A fresh worktree has no untracked files, so nothing runs until you set it up:
 
 ```bash
 cd ../open_tms-412
-cp ../open_tms/backend/.env backend/.env    # .env is gitignored, it doesn't come with the worktree
+cp ../ather_tms/backend/.env backend/.env    # .env is gitignored, it doesn't come with the worktree
 npm install                                  # from the root — node_modules is hoisted
 ```
 

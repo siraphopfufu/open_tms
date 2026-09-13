@@ -59,7 +59,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     });
     const themeConfig = org?.themeConfig as Record<string, string> | null;
     return {
-      orgName: org?.name || 'Open TMS',
+      orgName: org?.name || 'Ather TMS',
       primaryColor: themeConfig?.['primary'] || '#1976d2',
       logoUrl: org?.logoStorageKey ? '/api/v1/theme/logo' : null,
     };
@@ -436,7 +436,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const pdfDoc = await PDFDocument.create();
     pdfDoc.setTitle(title);
     // Use org name for document creator metadata
-    let creatorName = 'Open TMS';
+    let creatorName = 'Ather TMS';
     try {
       const org = await this.prisma.organization.findFirst({ select: { name: true } });
       if (org?.name && org.name !== 'Default Organization') creatorName = org.name;

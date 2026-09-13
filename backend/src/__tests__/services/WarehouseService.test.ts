@@ -213,7 +213,7 @@ describe('WarehouseService', () => {
         expect(typeof result.data.token).toBe('string');
         expect(result.data.token.split('.')).toHaveLength(3);
         const payload = JSON.parse(Buffer.from(result.data.token.split('.')[1], 'base64url').toString());
-        expect(payload.iss).toBe('open-tms-auth');
+        expect(payload.iss).toBe('ather-tms-auth');
         expect(payload.sub).toBe('user-1');
         expect(payload.organizationId).toBe(mockUser.organizationId);
         // Warehouse logins mint a scoped session: authenticateJWT only
@@ -368,7 +368,7 @@ describe('WarehouseService', () => {
         const payload = JSON.parse(
           Buffer.from(result.data.token.split('.')[1], 'base64url').toString(),
         );
-        expect(payload.iss).toBe('open-tms-auth');
+        expect(payload.iss).toBe('ather-tms-auth');
         expect(payload.sub).toBe('user-1');
         expect(payload.organizationId).toBe(mockUser.organizationId);
         // Warehouse logins mint a scoped session: authenticateJWT only

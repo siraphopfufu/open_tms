@@ -53,7 +53,7 @@ declare module 'fastify' {
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required in production');
 }
-const JWT_SECRET = process.env.JWT_SECRET || 'open-tms-dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'ather-tms-dev-secret-change-in-production';
 
 /**
  * Decode and verify a JWT token (HS256).
@@ -83,7 +83,7 @@ function verifyJWT(token: string): JWTPayload {
   }
 
   // Check issuer
-  if (payload.iss && payload.iss !== 'open-tms-auth') {
+  if (payload.iss && payload.iss !== 'ather-tms-auth') {
     throw new Error('Invalid issuer');
   }
 
@@ -192,7 +192,7 @@ export async function authenticateCarrierJWT(req: FastifyRequest, reply: Fastify
   const token = authHeader.slice(7);
 
   try {
-    // Verify signature and expiry directly (verifyJWT rejects non-'open-tms-auth' issuers)
+    // Verify signature and expiry directly (verifyJWT rejects non-'ather-tms-auth' issuers)
     const parts = token.split('.');
     if (parts.length !== 3) throw new Error('Invalid token format');
 
@@ -205,7 +205,7 @@ export async function authenticateCarrierJWT(req: FastifyRequest, reply: Fastify
 
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString()) as CarrierJWTPayload;
     if (payload.exp && payload.exp * 1000 < Date.now()) throw new Error('Token expired');
-    if (payload.iss !== 'open-tms-carrier' || !payload.carrierId) throw new Error('Invalid carrier token');
+    if (payload.iss !== 'ather-tms-carrier' || !payload.carrierId) throw new Error('Invalid carrier token');
 
     req.carrierUser = payload;
   } catch {
@@ -227,7 +227,7 @@ export async function authenticateCustomerJWT(req: FastifyRequest, reply: Fastif
   const token = authHeader.slice(7);
 
   try {
-    // Verify signature and expiry manually (shared verifyJWT checks for 'open-tms-auth' issuer)
+    // Verify signature and expiry manually (shared verifyJWT checks for 'ather-tms-auth' issuer)
     const parts = token.split('.');
     if (parts.length !== 3) throw new Error('Invalid token format');
 
@@ -241,7 +241,7 @@ export async function authenticateCustomerJWT(req: FastifyRequest, reply: Fastif
 
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString()) as CustomerJWTPayload;
     if (payload.exp && payload.exp * 1000 < Date.now()) throw new Error('Token expired');
-    if (payload.iss !== 'open-tms-customer' || !payload.customerId) throw new Error('Invalid customer token');
+    if (payload.iss !== 'ather-tms-customer' || !payload.customerId) throw new Error('Invalid customer token');
 
     req.customerUser = payload;
   } catch {
@@ -294,14 +294,14 @@ export async function authenticateMainOrCustomerJWT(req: FastifyRequest, reply: 
   try {
     const payload = verifySignatureAndExpiry(authHeader.slice(7));
 
-    if (payload.iss === 'open-tms-customer') {
+    if (payload.iss === 'ather-tms-customer') {
       if (!payload.customerId) throw new Error('Invalid customer token');
       req.customerUser = payload as CustomerJWTPayload;
       return;
     }
 
-    // Internal tokens carry 'open-tms-auth' or omit iss entirely (matches verifyJWT).
-    if (!payload.iss || payload.iss === 'open-tms-auth') {
+    // Internal tokens carry 'ather-tms-auth' or omit iss entirely (matches verifyJWT).
+    if (!payload.iss || payload.iss === 'ather-tms-auth') {
       req.user = payload as JWTPayload;
       return;
     }
@@ -332,7 +332,7 @@ export async function optionalAuth(req: FastifyRequest): Promise<void> {
  *
  * Issued by POST /api/v1/share/:token/authenticate once the recipient has supplied the access
  * code. It carries the link it came from and the sections that link grants, and it is scoped to
- * a single shipment. `iss` is `open-tms-share`, which no other guard accepts, so a viewer token
+ * a single shipment. `iss` is `ather-tms-share`, which no other guard accepts, so a viewer token
  * cannot reach the admin API, either portal, or the warehouse surface.
  *
  * The granted sections travel in the token for convenience, but the share read path re-checks
@@ -365,7 +365,7 @@ export async function authenticateShareViewerJWT(req: FastifyRequest, reply: Fas
 
   try {
     const payload = verifySignatureAndExpiry(authHeader.slice(7)) as ShareViewerJWTPayload;
-    if (payload.iss !== 'open-tms-share' || !payload.sub || !payload.shipmentId || !payload.orgId) {
+    if (payload.iss !== 'ather-tms-share' || !payload.sub || !payload.shipmentId || !payload.orgId) {
       throw new Error('Invalid share token');
     }
     req.shareViewer = payload;

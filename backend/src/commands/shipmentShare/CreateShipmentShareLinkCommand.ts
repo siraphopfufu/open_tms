@@ -16,7 +16,7 @@ import { EVENT_TYPES } from '../../events/eventTypes.js';
 import { BaseCommandHandler, TransactionClient, EmitFn } from '../BaseCommandHandler.js';
 import { Command } from '../types.js';
 import { IShipmentShareService } from '../../services/ShipmentShareService.js';
-import { normaliseShareSections } from '@open-tms/shared';
+import { normaliseShareSections } from '@ather-tms/shared';
 
 export const CREATE_SHIPMENT_SHARE_LINK = 'shipment_share_link.create';
 

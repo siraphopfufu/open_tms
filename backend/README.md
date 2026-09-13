@@ -1,6 +1,6 @@
 # Backend
 
-Fastify + Prisma API for Open TMS.
+Fastify + Prisma API for Ather TMS.
 
 - Dev: `npm run dev`
 - Migrate: `npm run prisma:migrate`

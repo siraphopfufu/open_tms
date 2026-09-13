@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Cloud SQL Database Setup Script for Open TMS
+# Cloud SQL Database Setup Script for Ather TMS
 # Usage: ./setup-database.sh [PROJECT_ID] [REGION] [INSTANCE_NAME]
 
 set -e
 
-PROJECT_ID=${1:-"open-tms-demo"}
+PROJECT_ID=${1:-"ather-tms-demo"}
 REGION=${2:-"us-central1"}
-INSTANCE_NAME=${3:-"open-tms-db"}
+INSTANCE_NAME=${3:-"ather-tms-db"}
 DATABASE_NAME="tms"
 DB_USER="tms_user"
 DB_PASSWORD=$(openssl rand -base64 32)

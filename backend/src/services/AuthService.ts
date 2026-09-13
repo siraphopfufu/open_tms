@@ -11,8 +11,8 @@ import {
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required in production');
 }
-const JWT_SECRET = process.env.JWT_SECRET || 'open-tms-dev-secret-change-in-production';
-const JWT_ISSUER = 'open-tms-auth';
+const JWT_SECRET = process.env.JWT_SECRET || 'ather-tms-dev-secret-change-in-production';
+const JWT_ISSUER = 'ather-tms-auth';
 const TOKEN_EXPIRY_HOURS = 12;
 
 export interface InternalJWTPayload {

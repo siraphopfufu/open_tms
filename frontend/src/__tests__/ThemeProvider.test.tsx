@@ -50,7 +50,7 @@ describe('ThemeProvider', () => {
       );
     });
 
-    expect(screen.getByTestId('system-name')).toHaveTextContent('Open TMS');
+    expect(screen.getByTestId('system-name')).toHaveTextContent('Ather TMS');
     expect(screen.getByTestId('has-logo')).toHaveTextContent('false');
     expect(screen.getByTestId('logo-url')).toHaveTextContent('none');
   });
@@ -94,7 +94,7 @@ describe('ThemeProvider', () => {
     });
 
     // Should still render with defaults
-    expect(screen.getByTestId('system-name')).toHaveTextContent('Open TMS');
+    expect(screen.getByTestId('system-name')).toHaveTextContent('Ather TMS');
   });
 
   it('caches theme in sessionStorage', async () => {
@@ -119,7 +119,7 @@ describe('ThemeProvider', () => {
     });
 
     await waitFor(() => {
-      const cached = sessionStorage.getItem('open-tms-theme-cache');
+      const cached = sessionStorage.getItem('ather-tms-theme-cache');
       expect(cached).not.toBeNull();
       const parsed = JSON.parse(cached!);
       expect(parsed.systemName).toBe('Cached TMS');

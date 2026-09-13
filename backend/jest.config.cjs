@@ -21,7 +21,7 @@ module.exports = {
   moduleNameMapper: {
     // packages/shared ships ESM-only output; point tests at the TS source instead
     // so ts-jest compiles it inline rather than requiring the built ESM dist.
-    '^@open-tms/shared$': '<rootDir>/../packages/shared/src/index.ts',
+    '^@ather-tms/shared$': '<rootDir>/../packages/shared/src/index.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };

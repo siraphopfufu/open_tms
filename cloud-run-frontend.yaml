@@ -1,7 +1,7 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: open-tms-frontend
+  name: ather-tms-frontend
   annotations:
     run.googleapis.com/ingress: all
     run.googleapis.com/execution-environment: gen2
@@ -14,12 +14,12 @@ spec:
       containerConcurrency: 1000
       timeoutSeconds: 300
       containers:
-      - image: gcr.io/open-tms-demo/open-tms-frontend:latest
+      - image: gcr.io/ather-tms-demo/ather-tms-frontend:latest
         ports:
         - containerPort: 80
         env:
         - name: VITE_API_URL
-          value: "https://open-tms-backend-XXXXX-uc.a.run.app"
+          value: "https://ather-tms-backend-XXXXX-uc.a.run.app"
         resources:
           limits:
             cpu: "1"

@@ -13,7 +13,7 @@ import {
   SHIPMENT_SHARE_SECTIONS,
   SHIPMENT_SHARE_SECTION_LABELS,
   ShipmentShareSection,
-} from '@open-tms/shared';
+} from '@ather-tms/shared';
 import { API_URL } from '../api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

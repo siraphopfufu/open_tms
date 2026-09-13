@@ -1,6 +1,6 @@
 # Order & Shipment Management
 
-## What Open TMS Has (Built)
+## What Ather TMS Has (Built)
 
 ### Order Management
 - Order CRUD with full lifecycle (pending, validated, converted, cancelled, archived)

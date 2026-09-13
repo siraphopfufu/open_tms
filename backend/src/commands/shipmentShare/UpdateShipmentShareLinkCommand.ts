@@ -12,7 +12,7 @@ import { PgBossEventBus } from '../../events/PgBossEventBus.js';
 import { EVENT_TYPES } from '../../events/eventTypes.js';
 import { BaseCommandHandler, TransactionClient, EmitFn } from '../BaseCommandHandler.js';
 import { Command } from '../types.js';
-import { normaliseShareSections } from '@open-tms/shared';
+import { normaliseShareSections } from '@ather-tms/shared';
 import { SHARE_LINK_NO_SECTIONS, SHARE_LINK_EXPIRY_IN_PAST } from './CreateShipmentShareLinkCommand.js';
 
 export const UPDATE_SHIPMENT_SHARE_LINK = 'shipment_share_link.update';

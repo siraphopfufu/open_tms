@@ -1,7 +1,7 @@
 import { createHmac } from 'crypto';
 import { signInternalJWT, INTERNAL_JWT_ISSUER, INTERNAL_JWT_DEFAULT_TTL_HOURS } from '../../auth/internalJWT';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'open-tms-dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'ather-tms-dev-secret-change-in-production';
 
 function decode(token: string) {
   const [headerB64, payloadB64, signatureB64] = token.split('.');
@@ -47,7 +47,7 @@ describe('signInternalJWT', () => {
     expect(payload.organizationId).toBe('org-1');
   });
 
-  it('stamps iat, exp, and iss="open-tms-auth" so the existing authenticateJWT accepts it', () => {
+  it('stamps iat, exp, and iss="ather-tms-auth" so the existing authenticateJWT accepts it', () => {
     const before = Math.floor(Date.now() / 1000);
     const token = signInternalJWT(claims);
     const after = Math.floor(Date.now() / 1000);

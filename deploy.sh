@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# GCP Deployment Script for Open TMS
+# GCP Deployment Script for Ather TMS
 # Usage: ./deploy.sh [PROJECT_ID] [REGION]
 
 set -e
 
 PROJECT_ID=${1:-"your-project-id"}
 REGION=${2:-"us-central1"}
-SERVICE_NAME="open-tms"
+SERVICE_NAME="ather-tms"
 
-echo "🚀 Deploying Open TMS to GCP..."
+echo "🚀 Deploying Ather TMS to GCP..."
 echo "Project ID: $PROJECT_ID"
 echo "Region: $REGION"
 
@@ -44,12 +44,12 @@ cd ..
 
 # Get Cloud SQL connection name
 echo "🔍 Getting Cloud SQL connection name..."
-CLOUD_SQL_CONNECTION=$(gcloud sql instances describe open-tms-db --format='value(connectionName)' 2>/dev/null || echo "")
+CLOUD_SQL_CONNECTION=$(gcloud sql instances describe ather-tms-db --format='value(connectionName)' 2>/dev/null || echo "")
 
 # Deploy backend to Cloud Run
 echo "🚀 Deploying backend to Cloud Run..."
 if [ -z "$CLOUD_SQL_CONNECTION" ]; then
-  echo "⚠️  Warning: Cloud SQL instance 'open-tms-db' not found. Deploying without database connection."
+  echo "⚠️  Warning: Cloud SQL instance 'ather-tms-db' not found. Deploying without database connection."
   gcloud run deploy $SERVICE_NAME-backend \
     --image gcr.io/$PROJECT_ID/$SERVICE_NAME-backend:latest \
     --platform managed \

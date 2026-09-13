@@ -22,7 +22,7 @@ import { IShipmentShareService } from '../services/ShipmentShareService.js';
 import { IShipmentShareViewService } from '../services/ShipmentShareViewService.js';
 import { authenticateShareViewerJWT } from '../middleware/jwtAuth.js';
 import { RECORD_SHIPMENT_SHARE_ACCESS } from '../commands/shipmentShare/index.js';
-import { normaliseShareSections } from '@open-tms/shared';
+import { normaliseShareSections } from '@ather-tms/shared';
 
 /** Ten code attempts per minute from one address, across every link it might be trying. */
 const AUTHENTICATE_ATTEMPTS_PER_MINUTE = 10;

@@ -1,4 +1,4 @@
-# Terraform variables for Open TMS
+# Terraform variables for Ather TMS
 
 variable "project_id" {
   description = "The GCP project ID"

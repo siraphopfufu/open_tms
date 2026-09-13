@@ -1,6 +1,6 @@
 # Authentication & Authorization Guide
 
-This guide covers the Open TMS auth-service: user management, JWT-based authentication, role-based access control (RBAC), and OAuth integration with Google and Microsoft.
+This guide covers the Ather TMS auth-service: user management, JWT-based authentication, role-based access control (RBAC), and OAuth integration with Google and Microsoft.
 
 ## Overview
 
@@ -576,8 +576,8 @@ The access token is a signed JWT containing:
 | `permissions` | Flattened array of permission strings |
 | `organizationId` | Organization ID (if set) |
 | `customerId` | Customer ID (if linked) |
-| `iss` | `open-tms-auth` |
-| `aud` | `open-tms` |
+| `iss` | `ather-tms-auth` |
+| `aud` | `ather-tms` |
 | `exp` | Expiration timestamp |
 
 Pass the access token in the `Authorization` header:
@@ -617,7 +617,7 @@ For local development:
 - Google: `http://localhost:3002/api/v1/oauth/google/callback`
 - Microsoft: `http://localhost:3002/api/v1/oauth/microsoft/callback`
 
-**3. Configure the provider** in Open TMS:
+**3. Configure the provider** in Ather TMS:
 
 ```bash
 # Get the provider ID
@@ -693,7 +693,7 @@ The frontend receives tokens at `/auth/callback?accessToken=...&refreshToken=...
 | **OAuth CSRF protection** | Random state parameter with 10-minute expiry |
 | **Self-deletion prevention** | Users cannot deactivate their own account |
 | **System role protection** | Built-in roles cannot be modified or deleted |
-| **JWT signing** | HMAC-SHA256 with configurable secret, issuer `open-tms-auth`, audience `open-tms` |
+| **JWT signing** | HMAC-SHA256 with configurable secret, issuer `ather-tms-auth`, audience `ather-tms` |
 
 ---
 
@@ -702,7 +702,7 @@ The frontend receives tokens at `/auth/callback?accessToken=...&refreshToken=...
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AUTH_PORT` | `3002` | Port the auth service listens on |
-| `JWT_SECRET` | `open-tms-dev-secret-change-in-production` | Secret for signing JWTs (change in production!) |
+| `JWT_SECRET` | `ather-tms-dev-secret-change-in-production` | Secret for signing JWTs (change in production!) |
 | `JWT_ACCESS_EXPIRES_IN` | `900` | Access token TTL in seconds (15 minutes) |
 | `JWT_REFRESH_EXPIRES_IN` | `604800` | Refresh token TTL in seconds (7 days) |
 | `AUTH_SERVICE_URL` | `http://localhost:3002` | Public URL for OAuth callback redirects |

@@ -19,15 +19,15 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual, createHmac } from
 import {
   ShipmentShareSection,
   normaliseShareSections,
-} from '@open-tms/shared';
+} from '@ather-tms/shared';
 
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required in production');
 }
-const JWT_SECRET = process.env.JWT_SECRET || 'open-tms-dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'ather-tms-dev-secret-change-in-production';
 
 /** Distinct issuer so a viewer token can never authenticate an admin, portal or warehouse route. */
-export const SHARE_JWT_ISSUER = 'open-tms-share';
+export const SHARE_JWT_ISSUER = 'ather-tms-share';
 
 /**
  * BUSINESS RULE: five wrong access codes lock a link for 15 minutes, matching the account

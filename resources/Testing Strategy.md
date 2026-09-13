@@ -122,14 +122,14 @@ test-db:
   ports:
     - "55433:5432"
   environment:
-    POSTGRES_DB: open_tms_test
+    POSTGRES_DB: ather_tms_test
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: postgres
 ```
 
 **NPM script to add:**
 ```json
-"test:integration": "DATABASE_URL=postgresql://postgres:postgres@localhost:55433/open_tms_test jest --config jest.integration.config.cjs --runInBand"
+"test:integration": "DATABASE_URL=postgresql://postgres:postgres@localhost:55433/ather_tms_test jest --config jest.integration.config.cjs --runInBand"
 ```
 
 ---
@@ -169,7 +169,7 @@ test:
     postgres:
       image: postgres:16-alpine
       env:
-        POSTGRES_DB: open_tms_test
+        POSTGRES_DB: ather_tms_test
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: postgres
       ports:
@@ -190,7 +190,7 @@ test:
     - name: Run migrations
       run: npx -w backend prisma migrate deploy
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/open_tms_test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ather_tms_test
     - name: Backend unit tests
       run: npm -w backend test
     - name: Frontend unit tests
@@ -198,7 +198,7 @@ test:
     - name: Backend integration tests
       run: npm -w backend run test:integration
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/open_tms_test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ather_tms_test
 ```
 
 ---

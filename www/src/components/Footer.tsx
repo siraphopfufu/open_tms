@@ -14,7 +14,7 @@ export default function Footer() {
                 </svg>
               </div>
               <span className="text-xl font-bold tracking-tight">
-                Open <span className="text-primary-400">TMS</span>
+                Ather <span className="text-primary-400">TMS</span>
               </span>
             </Link>
             <p className="text-sm text-surface-400 leading-relaxed">
@@ -58,7 +58,7 @@ export default function Footer() {
 
         <div className="mt-12 pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-surface-500">
-            &copy; {new Date().getFullYear()} Open TMS. Released under the MIT License.
+            &copy; {new Date().getFullYear()} Ather TMS. Released under the MIT License.
           </p>
           <div className="flex items-center gap-4 text-sm text-surface-500">
             <span>Integrates with System Loco IoT hardware</span>

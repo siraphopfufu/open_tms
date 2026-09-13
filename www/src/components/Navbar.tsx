@@ -55,7 +55,7 @@ export default function Navbar() {
               </svg>
             </div>
             <span className="text-xl font-bold tracking-tight">
-              Open <span className="text-primary-400">TMS</span>
+              Ather <span className="text-primary-400">TMS</span>
             </span>
           </Link>
 

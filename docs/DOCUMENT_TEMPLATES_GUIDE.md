@@ -1,6 +1,6 @@
 # Document Templates, Reports & File Storage Guide
 
-This guide covers the Open TMS document generation system, file storage, and attachments: Bills of Lading, shipping labels, customs forms, daily operations reports, template management, S3-compatible file storage, and file attachments on any entity.
+This guide covers the Ather TMS document generation system, file storage, and attachments: Bills of Lading, shipping labels, customs forms, daily operations reports, template management, S3-compatible file storage, and file attachments on any entity.
 
 ## Overview
 
@@ -74,7 +74,7 @@ curl "http://localhost:3001/api/v1/reports/daily?date=2026-03-30&format=xlsx" -o
 
 ## File Storage Setup
 
-Open TMS uses an S3-compatible file storage provider for all binary content (generated PDFs, uploaded attachments). When S3 is not configured, it falls back to storing content in the PostgreSQL database.
+Ather TMS uses an S3-compatible file storage provider for all binary content (generated PDFs, uploaded attachments). When S3 is not configured, it falls back to storing content in the PostgreSQL database.
 
 ### MinIO (Local Development)
 
@@ -98,14 +98,14 @@ Via MinIO console (http://localhost:9001) or the mc CLI:
 # or download from https://min.io/docs/minio/linux/reference/minio-mc.html
 
 mc alias set local http://localhost:9000 minioadmin minioadmin
-mc mb local/open-tms
+mc mb local/ather-tms
 ```
 
 **3. Set environment variables** (already set in docker-compose for the backend service):
 
 ```env
 S3_ENDPOINT=http://localhost:9000
-S3_BUCKET=open-tms
+S3_BUCKET=ather-tms
 S3_ACCESS_KEY_ID=minioadmin
 S3_SECRET_ACCESS_KEY=minioadmin
 S3_REGION=us-east-1

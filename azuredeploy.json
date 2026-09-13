@@ -2,12 +2,12 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
-    "description": "Deploy Open TMS to Azure Container Apps with PostgreSQL"
+    "description": "Deploy Ather TMS to Azure Container Apps with PostgreSQL"
   },
   "parameters": {
     "environmentName": {
       "type": "string",
-      "defaultValue": "open-tms",
+      "defaultValue": "ather-tms",
       "metadata": {
         "description": "Name prefix for all resources"
       }

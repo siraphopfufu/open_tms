@@ -1,11 +1,11 @@
 {
-  "name": "open-tms-webhook-service",
+  "name": "ather-tms-webhook-service",
   "version": "1.0.0",
-  "description": "Webhook service for Open TMS - handles external shipment updates",
+  "description": "Webhook service for Ather TMS - handles external shipment updates",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "deploy": "gcloud functions deploy open-tms-webhook --runtime nodejs20 --trigger-http --allow-unauthenticated --source .",
+    "deploy": "gcloud functions deploy ather-tms-webhook --runtime nodejs20 --trigger-http --allow-unauthenticated --source .",
     "dev": "functions-framework --target=webhook --port=8080"
   },
   "dependencies": {
@@ -25,6 +25,6 @@
     "tms",
     "google-cloud-function"
   ],
-  "author": "Open TMS",
+  "author": "Ather TMS",
   "license": "MIT"
 }

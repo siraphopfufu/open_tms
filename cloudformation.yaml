@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Open TMS — One-click deployment to AWS.
+  Ather TMS — One-click deployment to AWS.
   Provisions ECS Fargate (backend + frontend), RDS PostgreSQL, ALB,
   and a CodeBuild project that builds container images from source.
 
@@ -16,12 +16,12 @@ Parameters:
 
   GitHubRepo:
     Type: String
-    Default: https://github.com/dominicfinn/open_tms.git
+    Default: https://github.com/siraphopfufu/open_tms.git
     Description: Git repository URL for source builds
 
   EnvironmentName:
     Type: String
-    Default: open-tms
+    Default: ather-tms
     AllowedPattern: "[a-z0-9-]+"
     Description: Name prefix for all resources (lowercase, hyphens only)
 
@@ -219,6 +219,11 @@ Resources:
                 Resource: "*"
               - Effect: Allow
                 Action:
+                  - ecr-public:GetAuthorizationToken
+                  - sts:GetServiceBearerToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
@@ -257,12 +262,13 @@ Resources:
             pre_build:
               commands:
                 - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+                - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
             build:
               commands:
                 - echo "Building backend image..."
-                - docker build -t $BACKEND_REPO_URI:latest ./backend
+                - docker build -f backend/Dockerfile -t $BACKEND_REPO_URI:latest .
                 - echo "Building frontend image..."
-                - docker build -t $FRONTEND_REPO_URI:latest --build-arg VITE_API_URL=http://$ALB_DNS ./frontend
+                - docker build -f frontend/Dockerfile --build-arg VITE_API_URL=http://$ALB_DNS -t $FRONTEND_REPO_URI:latest .
             post_build:
               commands:
                 - docker push $BACKEND_REPO_URI:latest
@@ -336,7 +342,7 @@ Resources:
     Properties:
       Family: !Sub "${EnvironmentName}-frontend"
       Cpu: "256"
-      Memory: "256"
+      Memory: "512"
       NetworkMode: awsvpc
       RequiresCompatibilities: [FARGATE]
       ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
@@ -402,7 +408,7 @@ Resources:
       LoadBalancerArn: !Ref ALB
       Port: 80
       Protocol: HTTP
-      DefaultAction:
+      DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref FrontendTargetGroup
 
@@ -477,11 +483,11 @@ Resources:
 # ---------------------------------------------------------------------------
 Outputs:
   ApplicationURL:
-    Description: Open TMS frontend URL
+    Description: Ather TMS frontend URL
     Value: !Sub "http://${ALB.DNSName}"
 
   BackendURL:
-    Description: Open TMS backend API URL
+    Description: Ather TMS backend API URL
     Value: !Sub "http://${ALB.DNSName}/api/v1"
 
   APIDocsURL:

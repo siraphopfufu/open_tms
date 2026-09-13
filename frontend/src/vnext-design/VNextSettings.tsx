@@ -447,7 +447,7 @@ function ThemeTab() {
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>System name</Label>
-            <Input defaultValue="Open TMS" />
+            <Input defaultValue="Ather TMS" />
           </div>
           <div className="space-y-2">
             <Label>Primary color</Label>

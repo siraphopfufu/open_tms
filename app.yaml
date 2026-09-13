@@ -1,5 +1,5 @@
 spec:
-  name: open-tms
+  name: ather-tms
   region: nyc
 
   databases:

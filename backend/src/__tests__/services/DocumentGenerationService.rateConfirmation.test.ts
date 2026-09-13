@@ -21,7 +21,7 @@ function makePrisma(shipmentOverrides: Partial<typeof mockShipment> = {}) {
       findUniqueOrThrow: jest.fn().mockResolvedValue(shipment),
     },
     organization: {
-      findFirst: jest.fn().mockResolvedValue({ name: 'Open TMS', mcNumber: 'MC-123', themeConfig: null, logoStorageKey: null }),
+      findFirst: jest.fn().mockResolvedValue({ name: 'Ather TMS', mcNumber: 'MC-123', themeConfig: null, logoStorageKey: null }),
     },
   } as any;
 }

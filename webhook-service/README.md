@@ -1,6 +1,6 @@
-# Open TMS Webhook Service
+# Ather TMS Webhook Service
 
-A Google Cloud Function that handles webhook requests for shipment location updates in the Open TMS system.
+A Google Cloud Function that handles webhook requests for shipment location updates in the Ather TMS system.
 
 ## Features
 
@@ -60,7 +60,7 @@ curl -X POST 'http://localhost:8080' \
 ### Manual Deploy
 
 ```bash
-gcloud functions deploy open-tms-webhook \
+gcloud functions deploy ather-tms-webhook \
   --runtime=nodejs20 \
   --trigger-http \
   --allow-unauthenticated \
@@ -152,7 +152,7 @@ Returns service health status.
 This is a placeholder implementation. Future versions will include:
 
 1. **Database Integration**
-   - Connect to Open TMS PostgreSQL database
+   - Connect to Ather TMS PostgreSQL database
    - Update shipment locations in real-time
 
 2. **Enhanced Validation**
@@ -178,10 +178,10 @@ Track the full implementation progress: [GitHub Issue #TBD - Implement webhook s
 
 View function logs:
 ```bash
-gcloud functions logs read open-tms-webhook --region=us-central1
+gcloud functions logs read ather-tms-webhook --region=us-central1
 ```
 
 Monitor function metrics:
 ```bash
-gcloud functions describe open-tms-webhook --region=us-central1
+gcloud functions describe ather-tms-webhook --region=us-central1
 ```

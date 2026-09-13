@@ -1,5 +1,5 @@
 /**
- * Comprehensive seed script for Open TMS.
+ * Comprehensive seed script for Ather TMS.
  *
  * Builds a realistic, interconnected dataset modelled on a global 3PL:
  * diverse customers (frozen foods, pharma, chemicals, electronics, grocery,
@@ -2997,7 +2997,7 @@ async function seedShippingContainers(shipments: any[], locations: any[], orgId:
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('🚚 Open TMS Comprehensive Seed');
+  console.log('🚚 Ather TMS Comprehensive Seed');
   console.log('================================\n');
 
   if (!NO_WIPE) {
