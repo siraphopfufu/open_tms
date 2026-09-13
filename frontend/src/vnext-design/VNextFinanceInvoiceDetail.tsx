@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   CircleAlert,
   CreditCard,
+  Download,
+  FileText,
   Loader2,
   Send,
 } from 'lucide-react';
@@ -41,6 +43,7 @@ interface InvoiceLineItem {
   totalCents: number;
   shipmentId?: string;
   freightClass?: string;
+  containerNumber?: string;
 }
 
 interface Payment {
@@ -52,6 +55,14 @@ interface Payment {
   notes?: string;
 }
 
+interface WithholdingCertificate {
+  id: string;
+  certificateNumber: string;
+  withholdingType: string;
+  witheldAmountCents: number;
+  issueDate: string;
+}
+
 interface InvoiceData {
   id: string;
   invoiceNumber: string;
@@ -59,6 +70,9 @@ interface InvoiceData {
   customer: { id: string; name: string; billingEmail?: string; contactEmail?: string };
   subtotalCents: number;
   taxCents: number;
+  vatCents: number;
+  whtCents: number;
+  netPayableCents: number;
   totalCents: number;
   paidCents: number;
   balanceCents: number;
@@ -72,10 +86,12 @@ interface InvoiceData {
   internalNotes?: string;
   lineItems: InvoiceLineItem[];
   payments: Payment[];
+  withholdingCertificate?: WithholdingCertificate | null;
 }
 
-function formatMoney(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatMoney(cents: number, currency = 'USD'): string {
+  const symbol = currency === 'THB' ? '฿' : '$';
+  return `${symbol}${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function formatDate(d?: string): string {
   if (!d) return '-';
@@ -146,6 +162,38 @@ export default function VNextFinanceInvoiceDetail() {
     setPaymentRef('');
   };
 
+  const downloadDocument = async (endpoint: string, actionKey: string) => {
+    setActionLoading(actionKey);
+    try {
+      const genRes = await fetch(`${API_URL}/api/v1/documents/${endpoint}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: id }),
+      });
+      const genJson = await genRes.json();
+      if (genJson.error) throw new Error(genJson.error);
+      const dlRes = await fetch(`${API_URL}/api/v1/documents/${genJson.data.id}/download`);
+      const blob = await dlRes.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = genJson.data.fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) { alert(e.message); }
+    finally { setActionLoading(''); }
+  };
+
+  const issueCertificate = async () => {
+    setActionLoading('certificate');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/invoices/${id}/withholding-certificate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      await load();
+    } catch (e: any) { alert(e.message); }
+    finally { setActionLoading(''); }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-muted-foreground">
@@ -165,6 +213,7 @@ export default function VNextFinanceInvoiceDetail() {
 
   const i = invoice;
   const isPastDue = new Date(i.dueDate) < new Date() && !['paid', 'void'].includes(i.status);
+  const isThai = i.currency === 'THB';
 
   return (
     <div className="space-y-6">
@@ -184,6 +233,10 @@ export default function VNextFinanceInvoiceDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => downloadDocument('invoice-pdf', 'invoice-pdf')} disabled={!!actionLoading}>
+            <Download className="h-4 w-4" />
+            {actionLoading === 'invoice-pdf' ? 'Preparing...' : 'Download PDF'}
+          </Button>
           {i.status === 'draft' && (
             <Button size="sm" onClick={() => doAction('approve')} disabled={!!actionLoading}>
               {actionLoading === 'approve' ? 'Approving...' : 'Approve'}
@@ -219,7 +272,7 @@ export default function VNextFinanceInvoiceDetail() {
             <h3 className="mb-4 text-base font-semibold">Record Payment</h3>
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="payment-amount">Amount ($)</Label>
+                <Label htmlFor="payment-amount">Amount ({isThai ? '฿' : '$'})</Label>
                 <Input
                   id="payment-amount"
                   type="number"
@@ -275,6 +328,7 @@ export default function VNextFinanceInvoiceDetail() {
                 <TableRow>
                   <TableHead>Description</TableHead>
                   <TableHead>Type</TableHead>
+                  {isThai && <TableHead>Container</TableHead>}
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -290,9 +344,10 @@ export default function VNextFinanceInvoiceDetail() {
                     <TableCell>
                       <Badge variant="muted">{li.chargeType.replace(/_/g, ' ')}</Badge>
                     </TableCell>
+                    {isThai && <TableCell className="font-mono text-sm">{li.containerNumber || '-'}</TableCell>}
                     <TableCell className="text-right font-mono tabular-nums">{li.quantity}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{formatMoney(li.unitPriceCents)}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums font-medium">{formatMoney(li.totalCents)}</TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">{formatMoney(li.unitPriceCents, i.currency)}</TableCell>
+                    <TableCell className="text-right font-mono tabular-nums font-medium">{formatMoney(li.totalCents, i.currency)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -301,31 +356,95 @@ export default function VNextFinanceInvoiceDetail() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="font-semibold">Subtotal</span>
-                  <span className="font-mono tabular-nums font-semibold">{formatMoney(i.subtotalCents)}</span>
+                  <span className="font-mono tabular-nums font-semibold">{formatMoney(i.subtotalCents, i.currency)}</span>
                 </div>
-                {i.taxCents > 0 && (
-                  <div className="flex justify-between">
-                    <span>Tax</span>
-                    <span className="font-mono tabular-nums">{formatMoney(i.taxCents)}</span>
-                  </div>
+                {isThai ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span>VAT (7%)</span>
+                      <span className="font-mono tabular-nums">{formatMoney(i.vatCents, i.currency)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Withholding Tax (1%, deducted by payer)</span>
+                      <span className="font-mono tabular-nums">-{formatMoney(i.whtCents, i.currency)}</span>
+                    </div>
+                    <div className="flex justify-between text-base">
+                      <span className="font-bold">Net Payable</span>
+                      <span className="font-mono tabular-nums font-bold">{formatMoney(i.netPayableCents, i.currency)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {i.taxCents > 0 && (
+                      <div className="flex justify-between">
+                        <span>Tax</span>
+                        <span className="font-mono tabular-nums">{formatMoney(i.taxCents, i.currency)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-base">
+                      <span className="font-bold">Total</span>
+                      <span className="font-mono tabular-nums font-bold">{formatMoney(i.totalCents, i.currency)}</span>
+                    </div>
+                  </>
                 )}
-                <div className="flex justify-between text-base">
-                  <span className="font-bold">Total</span>
-                  <span className="font-mono tabular-nums font-bold">{formatMoney(i.totalCents)}</span>
-                </div>
                 {i.paidCents > 0 && (
                   <div className="flex justify-between text-success">
                     <span>Paid</span>
-                    <span className="font-mono tabular-nums">-{formatMoney(i.paidCents)}</span>
+                    <span className="font-mono tabular-nums">-{formatMoney(i.paidCents, i.currency)}</span>
                   </div>
                 )}
                 <div className={cn('flex justify-between font-bold', i.balanceCents > 0 ? 'text-destructive' : 'text-success')}>
                   <span>Balance Due</span>
-                  <span className="font-mono tabular-nums">{formatMoney(i.balanceCents)}</span>
+                  <span className="font-mono tabular-nums">{formatMoney(i.balanceCents, i.currency)}</span>
                 </div>
               </div>
             </div>
           </Card>
+
+          {isThai && (
+            <Card>
+              <div className="flex items-center justify-between p-5">
+                <h2 className="text-lg font-semibold">Withholding Tax Certificate (50 ทวิ)</h2>
+                {!i.withholdingCertificate && i.whtCents > 0 && (
+                  <Button size="sm" onClick={issueCertificate} disabled={!!actionLoading}>
+                    <FileText className="h-4 w-4" />
+                    {actionLoading === 'certificate' ? 'Issuing...' : 'Issue Certificate'}
+                  </Button>
+                )}
+              </div>
+              <Separator />
+              <div className="p-5">
+                {i.withholdingCertificate ? (
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <dl className="grid grid-cols-3 gap-6 text-sm">
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Certificate #</dt>
+                        <dd className="font-mono">{i.withholdingCertificate.certificateNumber}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Form</dt>
+                        <dd>{i.withholdingCertificate.withholdingType === 'pnd3' ? 'ภ.ง.ด. 3' : 'ภ.ง.ด. 53'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Withheld Amount</dt>
+                        <dd className="font-mono tabular-nums">{formatMoney(i.withholdingCertificate.witheldAmountCents, i.currency)}</dd>
+                      </div>
+                    </dl>
+                    <Button size="sm" variant="outline" onClick={() => downloadDocument('withholding-certificate-pdf', 'wht-pdf')} disabled={!!actionLoading}>
+                      <Download className="h-4 w-4" />
+                      {actionLoading === 'wht-pdf' ? 'Preparing...' : 'Download PDF'}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {i.whtCents > 0
+                      ? 'No certificate issued yet — issue one once the customer confirms the withheld amount.'
+                      : 'This invoice has no withholding tax to certify.'}
+                  </p>
+                )}
+              </div>
+            </Card>
+          )}
 
           {i.payments.length > 0 && (
             <Card>
@@ -349,7 +468,7 @@ export default function VNextFinanceInvoiceDetail() {
                       <TableCell>{formatDate(p.receivedDate)}</TableCell>
                       <TableCell>{p.paymentMethod ?? '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{p.referenceNumber ?? '-'}</TableCell>
-                      <TableCell className="text-right font-mono tabular-nums font-medium text-success">{formatMoney(p.amountCents)}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums font-medium text-success">{formatMoney(p.amountCents, i.currency)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{p.notes ?? ''}</TableCell>
                     </TableRow>
                   ))}

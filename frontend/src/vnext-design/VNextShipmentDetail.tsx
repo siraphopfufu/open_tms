@@ -14,6 +14,7 @@ import {
   ChevronDown,
   CircleHelp,
   Clock,
+  Container,
   CreditCard,
   Crosshair,
   Download,
@@ -277,6 +278,526 @@ function FinancialsTab({ shipmentId, hasBol }: { shipmentId: string; hasBol: boo
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Container Tab (Thai drayage: ISO container + EIR/weight tickets) ───
+const CONTAINER_SIZE_OPTIONS = ['20GP', '40GP', '40HC', '40RF'];
+
+function ContainerTab({ shipmentId, container, onAttached }: { shipmentId: string; container: any; onAttached: () => void }) {
+  const [eirTickets, setEirTickets] = useState<any[]>([]);
+  const [weightTickets, setWeightTickets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const [newContainerNumber, setNewContainerNumber] = useState('');
+  const [newSizeType, setNewSizeType] = useState('40GP');
+  const [newSealNumber, setNewSealNumber] = useState('');
+  const [newShippingLine, setNewShippingLine] = useState('');
+
+  const [eirTicketNumber, setEirTicketNumber] = useState('');
+  const [eirDirection, setEirDirection] = useState('pickup_empty');
+
+  const [weightGross, setWeightGross] = useState('');
+  const [weightTare, setWeightTare] = useState('');
+
+  const loadDocs = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API_URL}/api/v1/shipments/${shipmentId}/eir`).then(r => r.json()),
+      fetch(`${API_URL}/api/v1/shipments/${shipmentId}/weight-tickets`).then(r => r.json()),
+    ])
+      .then(([eir, weight]) => {
+        setEirTickets(eir.data || []);
+        setWeightTickets(weight.data || []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [shipmentId]);
+
+  useEffect(() => { loadDocs(); }, [loadDocs]);
+
+  const attachContainer = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      const createRes = await fetch(`${API_URL}/api/v1/shipping-containers`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          containerNumber: newContainerNumber,
+          sizeType: newSizeType,
+          sealNumber: newSealNumber || undefined,
+          shippingLine: newShippingLine || undefined,
+        }),
+      });
+      const created = await createRes.json();
+      if (created.error) throw new Error(created.error);
+      const attachRes = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/container`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shippingContainerId: created.data.id }),
+      });
+      const attached = await attachRes.json();
+      if (attached.error) throw new Error(attached.error);
+      onAttached();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const addEir = async () => {
+    if (!eirTicketNumber.trim()) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/eir`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketNumber: eirTicketNumber, direction: eirDirection }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setEirTicketNumber('');
+      loadDocs();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const addWeightTicket = async () => {
+    const gross = parseFloat(weightGross);
+    if (!gross) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/weight-ticket`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grossWeightKg: gross, tareWeightKg: weightTare ? parseFloat(weightTare) : undefined }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setWeightGross(''); setWeightTare('');
+      loadDocs();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Shipping Container</CardTitle></CardHeader>
+        <CardContent>
+          {container ? (
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Container No.</dt>
+                <dd className="font-mono font-medium">{container.containerNumber}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Size</dt>
+                <dd>{container.sizeType}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Seal No.</dt>
+                <dd className="font-mono">{container.sealNumber || '-'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Shipping Line</dt>
+                <dd>{container.shippingLine || '-'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Status</dt>
+                <dd><Badge variant="muted">{container.status}</Badge></dd>
+              </div>
+            </dl>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">No container attached to this trip yet.</p>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div className="space-y-1.5">
+                  <Label>Container No.</Label>
+                  <Input value={newContainerNumber} onChange={e => setNewContainerNumber(e.target.value.toUpperCase())} placeholder="MSCU4455663" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Size</Label>
+                  <Select value={newSizeType} onValueChange={setNewSizeType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CONTAINER_SIZE_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Seal No.</Label>
+                  <Input value={newSealNumber} onChange={e => setNewSealNumber(e.target.value)} placeholder="ML-TH092144" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Shipping Line</Label>
+                  <Input value={newShippingLine} onChange={e => setNewShippingLine(e.target.value)} placeholder="Maersk" />
+                </div>
+              </div>
+              <Button size="sm" onClick={attachContainer} disabled={busy || !newContainerNumber.trim()}>
+                {busy ? 'Attaching...' : 'Attach Container'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">EIR Tickets ({eirTickets.length})</CardTitle></CardHeader>
+        <CardContent>
+          {!loading && eirTickets.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ticket #</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Issued</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {eirTickets.map(t => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-mono">{t.ticketNumber}</TableCell>
+                    <TableCell><Badge variant="muted">{t.direction.replace(/_/g, ' ')}</Badge></TableCell>
+                    <TableCell>{t.location?.name || '-'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{new Date(t.issuedAt).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Ticket #</Label>
+              <Input value={eirTicketNumber} onChange={e => setEirTicketNumber(e.target.value)} placeholder="EIR-2026-00142" className="w-[180px]" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Direction</Label>
+              <Select value={eirDirection} onValueChange={setEirDirection}>
+                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pickup_empty">Pickup empty</SelectItem>
+                  <SelectItem value="return_empty">Return empty</SelectItem>
+                  <SelectItem value="pickup_laden">Pickup laden</SelectItem>
+                  <SelectItem value="return_laden">Return laden</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button size="sm" onClick={addEir} disabled={busy || !eirTicketNumber.trim()}>Record EIR</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Weight Tickets ({weightTickets.length})</CardTitle></CardHeader>
+        <CardContent>
+          {!loading && weightTickets.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Gross (kg)</TableHead>
+                  <TableHead>Tare (kg)</TableHead>
+                  <TableHead>Net (kg)</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Weighed</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {weightTickets.map(t => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-mono tabular-nums">{t.grossWeightKg.toLocaleString()}</TableCell>
+                    <TableCell className="font-mono tabular-nums">{t.tareWeightKg?.toLocaleString() ?? '-'}</TableCell>
+                    <TableCell className="font-mono tabular-nums">{t.netWeightKg?.toLocaleString() ?? '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant={t.isOverweight ? 'destructive' : 'success'}>
+                        {t.isOverweight ? 'Overweight' : 'Within limit'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{new Date(t.weighedAt).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Gross weight (kg)</Label>
+              <Input type="number" value={weightGross} onChange={e => setWeightGross(e.target.value)} placeholder="28450" className="w-[150px]" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tare weight (kg)</Label>
+              <Input type="number" value={weightTare} onChange={e => setWeightTare(e.target.value)} placeholder="4200" className="w-[150px]" />
+            </div>
+            <Button size="sm" onClick={addWeightTicket} disabled={busy || !weightGross}>Record Weight</Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">Thai highway limit: 50,500 kg gross for a 6-axle/22-wheel combination.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Trip Settlement Tab (driver advance + fuel benchmark reconciliation) ─
+function TripSettlementTab({ shipmentId, driverId }: { shipmentId: string; driverId?: string | null }) {
+  const [advance, setAdvance] = useState<any>(null);
+  const [fuelTx, setFuelTx] = useState<any[]>([]);
+  const [settlement, setSettlement] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const [fuelEstimate, setFuelEstimate] = useState('');
+  const [tollEstimate, setTollEstimate] = useState('');
+  const [allowance, setAllowance] = useState('');
+
+  const [liters, setLiters] = useState('');
+  const [pricePerLiter, setPricePerLiter] = useState('');
+
+  const [distanceKm, setDistanceKm] = useState('');
+  const [dieselPrice, setDieselPrice] = useState('');
+  const [actualToll, setActualToll] = useState('');
+
+  const fmtMoney = (c: number) => `฿${(c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const loadAll = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API_URL}/api/v1/shipments/${shipmentId}/driver-advance`).then(r => r.json()),
+      fetch(`${API_URL}/api/v1/shipments/${shipmentId}/fuel-transactions`).then(r => r.json()),
+      fetch(`${API_URL}/api/v1/shipments/${shipmentId}/trip-settlement`).then(r => r.json()),
+    ])
+      .then(([a, f, s]) => {
+        setAdvance(a.data || null);
+        setFuelTx(f.data || []);
+        setSettlement(s.data || null);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [shipmentId]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const approveAdvance = async () => {
+    setBusy(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/driver-advance`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: driverId || undefined,
+          fuelEstimateCents: Math.round(parseFloat(fuelEstimate || '0') * 100),
+          tollEstimateCents: Math.round(parseFloat(tollEstimate || '0') * 100),
+          allowanceCents: allowance ? Math.round(parseFloat(allowance) * 100) : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      loadAll();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const transferAdvance = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/driver-advance/transfer`, { method: 'POST' });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      loadAll();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const addFuel = async () => {
+    if (!liters || !pricePerLiter) return;
+    setBusy(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/fuel-transactions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ liters: parseFloat(liters), pricePerLiterCents: Math.round(parseFloat(pricePerLiter) * 100) }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setLiters(''); setPricePerLiter('');
+      loadAll();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const computeSettlement = async () => {
+    if (!distanceKm || !dieselPrice) return;
+    setBusy(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/trip-settlement`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          distanceKm: parseFloat(distanceKm),
+          dieselPriceCentsPerLiter: Math.round(parseFloat(dieselPrice) * 100),
+          actualTollCents: actualToll ? Math.round(parseFloat(actualToll) * 100) : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      loadAll();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const markSettled = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/trip-settlement/settle`, { method: 'POST' });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      loadAll();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  if (loading) return (
+    <Card><CardContent className="p-6"><p>Loading trip settlement...</p></CardContent></Card>
+  );
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Driver Advance</CardTitle></CardHeader>
+        <CardContent>
+          {advance ? (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-sm">
+                <div><dt className="text-xs text-muted-foreground">Fuel Estimate</dt><dd className="font-mono">{fmtMoney(advance.fuelEstimateCents)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Toll Estimate</dt><dd className="font-mono">{fmtMoney(advance.tollEstimateCents)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Allowance</dt><dd className="font-mono">{fmtMoney(advance.allowanceCents)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Total Advance</dt><dd className="font-mono font-semibold">{fmtMoney(advance.totalAdvanceCents)}</dd></div>
+              </dl>
+              <div className="flex items-center gap-2">
+                <Badge variant={advance.status === 'transferred' ? 'success' : 'warning'}>{advance.status}</Badge>
+                {advance.status === 'approved' && (
+                  <Button size="sm" onClick={transferAdvance} disabled={busy}>Mark Transferred</Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">No advance approved yet for this trip.</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Fuel estimate (฿)</Label>
+                  <Input type="number" value={fuelEstimate} onChange={e => setFuelEstimate(e.target.value)} placeholder="900" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Toll estimate (฿)</Label>
+                  <Input type="number" value={tollEstimate} onChange={e => setTollEstimate(e.target.value)} placeholder="150" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Allowance (฿, blank = driver's standard rate)</Label>
+                  <Input type="number" value={allowance} onChange={e => setAllowance(e.target.value)} placeholder="300" />
+                </div>
+              </div>
+              <Button size="sm" onClick={approveAdvance} disabled={busy}>Approve Advance</Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Fuel Transactions ({fuelTx.length})</CardTitle></CardHeader>
+        <CardContent>
+          {fuelTx.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Liters</TableHead>
+                  <TableHead>Price/L</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Purchased</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {fuelTx.map(t => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-mono tabular-nums">{t.liters.toFixed(1)}</TableCell>
+                    <TableCell className="font-mono tabular-nums">{fmtMoney(t.pricePerLiterCents)}</TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">{fmtMoney(t.totalCostCents)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{new Date(t.purchasedAt).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Liters</Label>
+              <Input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="29.7" className="w-[130px]" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Price/L (฿)</Label>
+              <Input type="number" value={pricePerLiter} onChange={e => setPricePerLiter(e.target.value)} placeholder="32.00" className="w-[130px]" />
+            </div>
+            <Button size="sm" onClick={addFuel} disabled={busy || !liters || !pricePerLiter}>Record Fuel Receipt</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className={cn(settlement?.isOverBenchmark && 'border-destructive/40')}>
+        <CardHeader><CardTitle className="text-base">Trip Settlement</CardTitle></CardHeader>
+        <CardContent>
+          {settlement ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Badge variant={settlement.isOverBenchmark ? 'destructive' : 'success'}>
+                  {settlement.isOverBenchmark ? `Over benchmark (${settlement.fuelVariancePercent.toFixed(1)}%)` : `Within benchmark (${settlement.fuelVariancePercent.toFixed(1)}%)`}
+                </Badge>
+                <Badge variant={settlement.status === 'settled' ? 'success' : 'muted'}>{settlement.status}</Badge>
+              </div>
+              <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-sm">
+                <div><dt className="text-xs text-muted-foreground">Distance</dt><dd>{settlement.distanceKm} km</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Benchmark</dt><dd>{settlement.vehicleKmPerLiter} km/L</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Expected Fuel</dt><dd className="font-mono">{fmtMoney(settlement.expectedFuelCostCents)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Actual Fuel</dt><dd className="font-mono">{fmtMoney(settlement.actualFuelCostCents)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Toll</dt><dd className="font-mono">{fmtMoney(settlement.actualTollCents)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Allowance</dt><dd className="font-mono">{fmtMoney(settlement.allowanceCents)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Advance Given</dt><dd className="font-mono">{fmtMoney(settlement.totalAdvanceCents)}</dd></div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">{settlement.netSettlementCents >= 0 ? 'Driver Returns' : 'Company Tops Up'}</dt>
+                  <dd className={cn('font-mono font-semibold', settlement.netSettlementCents >= 0 ? 'text-success' : 'text-destructive')}>
+                    {fmtMoney(Math.abs(settlement.netSettlementCents))}
+                  </dd>
+                </div>
+              </dl>
+              {settlement.status !== 'settled' && (
+                <Button size="sm" onClick={markSettled} disabled={busy}>Mark Settled</Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Reconcile actual fuel cost against the benchmark once fuel receipts are in.</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Distance (km)</Label>
+                  <Input type="number" value={distanceKm} onChange={e => setDistanceKm(e.target.value)} placeholder="95" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Diesel price (฿/L)</Label>
+                  <Input type="number" value={dieselPrice} onChange={e => setDieselPrice(e.target.value)} placeholder="32.00" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Actual toll (฿)</Label>
+                  <Input type="number" value={actualToll} onChange={e => setActualToll(e.target.value)} placeholder="150" />
+                </div>
+              </div>
+              <Button size="sm" onClick={computeSettlement} disabled={busy || !distanceKm || !dieselPrice}>Compute Settlement</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -2263,6 +2784,8 @@ export default function VNextShipmentDetail() {
     { value: 'documents', label: 'Docs', Icon: FileText },
     { value: 'financials', label: 'Financials', Icon: CreditCard },
     { value: 'cargo', label: 'Cargo', Icon: Package },
+    { value: 'container', label: 'Container', Icon: Container },
+    { value: 'settlement', label: 'Trip Settlement', Icon: Wallet },
     { value: 'telemetry', label: 'Telemetry', Icon: Thermometer },
     { value: 'sla', label: 'SLA', Icon: Timer },
     { value: 'carrier-tracking', label: 'Carriers', Icon: Target },
@@ -3035,6 +3558,14 @@ export default function VNextShipmentDetail() {
 
             <TabsContent value="cargo" className="mt-4">
               <CargoTab shipmentId={id!} />
+            </TabsContent>
+
+            <TabsContent value="container" className="mt-4">
+              <ContainerTab shipmentId={id!} container={shipment.shippingContainer} onAttached={loadShipment} />
+            </TabsContent>
+
+            <TabsContent value="settlement" className="mt-4">
+              <TripSettlementTab shipmentId={id!} driverId={shipment.loads?.[0]?.driverId} />
             </TabsContent>
 
             <TabsContent value="telemetry" className="mt-4">

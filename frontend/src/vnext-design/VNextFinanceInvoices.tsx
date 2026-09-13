@@ -48,8 +48,9 @@ interface Invoice {
   lineItems: any[];
 }
 
-function formatMoney(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatMoney(cents: number, currency = 'USD'): string {
+  const symbol = currency === 'THB' ? '฿' : '$';
+  return `${symbol}${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(d: string): string {
@@ -240,9 +241,9 @@ export default function VNextFinanceInvoices() {
                   <TableCell>
                     <Badge variant={statusVariant(inv.status)}>{inv.status.replace(/_/g, ' ')}</Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono tabular-nums font-medium">{formatMoney(inv.totalCents)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums font-medium">{formatMoney(inv.totalCents, inv.currency)}</TableCell>
                   <TableCell className={cn('text-right font-mono tabular-nums font-medium', inv.balanceCents > 0 ? 'text-destructive' : 'text-success')}>
-                    {formatMoney(inv.balanceCents)}
+                    {formatMoney(inv.balanceCents, inv.currency)}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDate(inv.issueDate)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDate(inv.dueDate)}</TableCell>
