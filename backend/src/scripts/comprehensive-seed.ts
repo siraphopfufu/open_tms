@@ -17,6 +17,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { createHmac, randomBytes } from 'crypto';
 import { seedSystemRoles } from '../auth/seedRoles.js';
 import { calculateThaiTax } from '../services/thaiTax/calculator.js';
+import { calculateFuelBenchmark, calculateSettlementTotals } from '../services/tripSettlement/calculator.js';
 
 const prisma = new PrismaClient();
 const NO_WIPE = process.argv.includes('--no-wipe');
@@ -136,6 +137,9 @@ async function wipe() {
   await prisma.shipmentReadModel.deleteMany();
   await prisma.eirTicket.deleteMany();
   await prisma.weightTicket.deleteMany();
+  await prisma.tripSettlement.deleteMany();
+  await prisma.fuelTransaction.deleteMany();
+  await prisma.driverAdvance.deleteMany();
   await prisma.shipment.deleteMany();
   await prisma.shipmentType.deleteMany();
   await prisma.shippingContainer.deleteMany();
@@ -3104,7 +3108,191 @@ async function seedThaiFinanceDemo(orgId: string, locations: any[], shippingCont
     },
   });
 
-  return { customer, invoice };
+  return { customer, invoice, shipment };
+}
+
+// Driver advance & trip settlement (customer process flowchart stages 1-3):
+// an own-fleet trip settled cleanly within the fuel benchmark, and a
+// subcontractor trip that runs over it (the red-flag case the report calls
+// out explicitly).
+async function seedThaiFleetSettlementDemo(orgId: string, shipment: any, locations: any[]) {
+  const byName = (name: string) => locations.find((l) => l.name === name);
+
+  // Own fleet: one carrier record representing the company's own trucks, per
+  // the existing Carrier/Vehicle/Driver model (Carrier's MC/DOT/SCAC fields
+  // are all optional, so this needs none of them).
+  const ownFleet = await prisma.carrier.create({
+    data: { orgId, name: 'Boonchai Transport - Own Fleet', country: 'Thailand', currency: 'THB' },
+  });
+  const ownVehicle = await prisma.vehicle.create({
+    data: { orgId, carrierId: ownFleet.id, plate: '70-1234 ชบ.', type: 'tractor', standardKmPerLiter: 3.2 },
+  });
+  const ownDriver = await prisma.driver.create({
+    data: { orgId, carrierId: ownFleet.id, name: 'สมหมาย ใจดี', phone: '081-234-5678', standardAllowanceCents: 30000 },
+  });
+
+  await prisma.load.create({
+    data: {
+      shipmentId: shipment.id,
+      vehicleId: ownVehicle.id,
+      driverId: ownDriver.id,
+      trailerPlate: '70-5678 ชบ.',
+      assignedAt: daysAgo(3),
+    },
+  });
+
+  // Stage 2: advance approved and transferred before departure.
+  const fuelEstimateCents = 90000; // ฿900
+  const tollEstimateCents = 15000; // ฿150 (M7)
+  const allowanceCents = ownDriver.standardAllowanceCents!;
+  const advance = await prisma.driverAdvance.create({
+    data: {
+      orgId,
+      shipmentId: shipment.id,
+      driverId: ownDriver.id,
+      fuelEstimateCents,
+      tollEstimateCents,
+      allowanceCents,
+      totalAdvanceCents: fuelEstimateCents + tollEstimateCents + allowanceCents,
+      transferMethod: 'cash',
+      status: 'transferred',
+      approvedAt: daysAgo(3),
+      transferredAt: daysAgo(3),
+    },
+  });
+
+  // Stage 3: driver returns with the actual fuel slip — comes in under
+  // benchmark, so this trip settles cleanly.
+  const distanceKm = 95;
+  const dieselPriceCentsPerLiter = 3200; // ฿32.00/L
+  const litersUsed = distanceKm / 3.2; // exactly on benchmark
+  const fuelTx = await prisma.fuelTransaction.create({
+    data: {
+      orgId,
+      shipmentId: shipment.id,
+      liters: litersUsed,
+      pricePerLiterCents: dieselPriceCentsPerLiter,
+      totalCostCents: Math.round(litersUsed * dieselPriceCentsPerLiter),
+      odometerKm: 128450,
+      purchasedAt: daysAgo(1),
+    },
+  });
+
+  const benchmark = calculateFuelBenchmark(distanceKm, 3.2, dieselPriceCentsPerLiter, fuelTx.totalCostCents);
+  const actualTollCents = 15000;
+  const totals = calculateSettlementTotals(advance.totalAdvanceCents, fuelTx.totalCostCents, actualTollCents, allowanceCents);
+  await prisma.tripSettlement.create({
+    data: {
+      orgId,
+      shipmentId: shipment.id,
+      driverId: ownDriver.id,
+      distanceKm,
+      vehicleKmPerLiter: 3.2,
+      dieselPriceCentsPerLiter,
+      expectedFuelCostCents: benchmark.expectedFuelCostCents,
+      actualFuelCostCents: fuelTx.totalCostCents,
+      actualTollCents,
+      allowanceCents,
+      fuelVariancePercent: benchmark.fuelVariancePercent,
+      isOverBenchmark: benchmark.isOverBenchmark,
+      totalAdvanceCents: advance.totalAdvanceCents,
+      totalActualCostCents: totals.totalActualCostCents,
+      netSettlementCents: totals.netSettlementCents,
+      status: 'settled',
+      settledAt: daysAgo(1),
+    },
+  });
+
+  // Second trip, subcontractor-driven, deliberately over the 10% benchmark —
+  // the report's own example of the red-flag case.
+  const subcontractor = await prisma.carrier.create({
+    data: {
+      orgId,
+      name: 'สมชาย ขนส่ง (รถร่วม)',
+      country: 'Thailand',
+      currency: 'THB',
+      nationalId: '1103700123456', // individual owner-operator, demo value
+    },
+  });
+  const subVehicle = await prisma.vehicle.create({
+    data: { orgId, carrierId: subcontractor.id, plate: '71-9988 ชบ.', type: 'tractor', standardKmPerLiter: 3.2 },
+  });
+  const subDriver = await prisma.driver.create({
+    data: { orgId, carrierId: subcontractor.id, name: 'สมชาย รักงาน', phone: '089-876-5432' },
+  });
+
+  const terminalC1 = byName('Laem Chabang Terminal C1 (TIPS)');
+  const tifDepot = byName('TIF Depot - Laem Chabang');
+  const subShipment = await prisma.shipment.create({
+    data: {
+      orgId,
+      reference: 'SHP-TH-00002',
+      status: 'complete',
+      customerId: shipment.customerId,
+      originId: tifDepot?.id,
+      destinationId: terminalC1?.id,
+      serviceLevel: 'FTL',
+      pickupDate: daysAgo(2),
+      deliveryDate: daysAgo(1),
+    },
+  });
+  await prisma.load.create({
+    data: { shipmentId: subShipment.id, vehicleId: subVehicle.id, driverId: subDriver.id, trailerPlate: '71-1122 ชบ.', assignedAt: daysAgo(2) },
+  });
+
+  const subAdvance = await prisma.driverAdvance.create({
+    data: {
+      orgId,
+      shipmentId: subShipment.id,
+      driverId: subDriver.id,
+      fuelEstimateCents: 90000,
+      tollEstimateCents: 15000,
+      allowanceCents: 0, // subcontractors settle their own allowance
+      totalAdvanceCents: 105000,
+      transferMethod: 'transfer',
+      status: 'transferred',
+      approvedAt: daysAgo(2),
+      transferredAt: daysAgo(2),
+    },
+  });
+
+  const subDistanceKm = 95;
+  // ~25% over the 3.2 km/L benchmark, well past the 10% flag threshold.
+  const subLiters = subDistanceKm / 2.4;
+  const subFuelTx = await prisma.fuelTransaction.create({
+    data: {
+      orgId,
+      shipmentId: subShipment.id,
+      liters: subLiters,
+      pricePerLiterCents: dieselPriceCentsPerLiter,
+      totalCostCents: Math.round(subLiters * dieselPriceCentsPerLiter),
+      purchasedAt: daysAgo(1),
+    },
+  });
+  const subBenchmark = calculateFuelBenchmark(subDistanceKm, 3.2, dieselPriceCentsPerLiter, subFuelTx.totalCostCents);
+  const subTotals = calculateSettlementTotals(subAdvance.totalAdvanceCents, subFuelTx.totalCostCents, 15000, 0);
+  await prisma.tripSettlement.create({
+    data: {
+      orgId,
+      shipmentId: subShipment.id,
+      driverId: subDriver.id,
+      distanceKm: subDistanceKm,
+      vehicleKmPerLiter: 3.2,
+      dieselPriceCentsPerLiter,
+      expectedFuelCostCents: subBenchmark.expectedFuelCostCents,
+      actualFuelCostCents: subFuelTx.totalCostCents,
+      actualTollCents: 15000,
+      allowanceCents: 0,
+      fuelVariancePercent: subBenchmark.fuelVariancePercent,
+      isOverBenchmark: subBenchmark.isOverBenchmark,
+      totalAdvanceCents: subAdvance.totalAdvanceCents,
+      totalActualCostCents: subTotals.totalActualCostCents,
+      netSettlementCents: subTotals.netSettlementCents,
+      status: 'pending', // over-benchmark trips need a review before settling
+    },
+  });
+
+  return { ownFleet, subcontractor, subShipment };
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -3177,6 +3365,10 @@ async function main() {
   console.log('Seeding Thai finance demo (THB customer, invoice, WHT certificate)...');
   const thaiFinance = await seedThaiFinanceDemo(org.id, locations, shippingContainers);
   console.log(`✓ Thai invoice: ${thaiFinance.invoice.invoiceNumber}`);
+
+  console.log('Seeding driver advance + trip settlement demo (own fleet + subcontractor)...');
+  const thaiFleet = await seedThaiFleetSettlementDemo(org.id, thaiFinance.shipment, locations);
+  console.log(`✓ Fleet: ${thaiFleet.ownFleet.name}, subcontractor trip: ${thaiFleet.subShipment.reference}`);
 
   // Most shipments are still fresh drafts with no carrier/lane/tracking, so
   // the remaining in-flight demo seeders (tenders, charges, AR/AP invoices)

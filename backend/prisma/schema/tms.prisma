@@ -134,6 +134,11 @@ model Shipment {
   eirTickets          EirTicket[]
   weightTickets       WeightTicket[]
 
+  // Driver advance / trip settlement (fuel & toll reconciliation)
+  driverAdvance   DriverAdvance?
+  fuelTransactions FuelTransaction[]
+  tripSettlement  TripSettlement?
+
   @@index([customerId])
   @@index([status])
   @@index([originId])
@@ -347,6 +352,13 @@ model Carrier {
   // Standard Carrier Alpha Code (needed for EDI 204)
   scacCode String?
 
+  // Thai subcontractor identification: taxId for a registered company,
+  // nationalId (13-digit citizen ID) for an individual owner-operator —
+  // whichever applies determines PND53 vs PND3 when we withhold tax on
+  // what we pay them (see WithholdingTaxCertificate).
+  taxId      String?
+  nationalId String?
+
   // Return label generation (carrier API or manual)
   returnLabelProvider       String? // null = not configured; manual | fedex | ups | dhl
   returnLabelAccountNumber  String? // carrier-side account number for return labels
@@ -397,6 +409,10 @@ model Vehicle {
   type       String
   capacityKg Int?
   capacityM3 Int?
+  // Trip settlement (driver advance/fuel reconciliation): benchmark fuel
+  // efficiency for this tractor, used to compute expected fuel cost against
+  // actual receipts. Falls back to a company-wide default when unset.
+  standardKmPerLiter Float?
   loads      Load[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -415,7 +431,14 @@ model Driver {
   name      String
   phone     String?
   email     String?
-  loads     Load[]
+  // Thai drayage: national ID (13 digits) for individual owner-operator
+  // drivers, and the standard per-diem/allowance rate dispatch pulls when
+  // assigning this driver to a trip.
+  nationalId             String?
+  standardAllowanceCents Int?
+  loads           Load[]
+  driverAdvances  DriverAdvance[]
+  tripSettlements TripSettlement[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -431,6 +454,10 @@ model Load {
   vehicleId  String?
   driver     Driver?   @relation(fields: [driverId], references: [id])
   driverId   String?
+  // Thai drayage: tractor (vehicle) and trailer/chassis are registered and
+  // plated separately, and a tractor pairs with different trailers trip to
+  // trip, so this is per-Load rather than a fixed Vehicle attribute.
+  trailerPlate String?
   assignedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -2757,4 +2784,104 @@ model WeightTicket {
 
   @@index([orgId])
   @@index([shipmentId])
+}
+
+// ─── Driver Advance & Trip Settlement ────────────────────────────────────────
+// Cash-in-hand cost control for a drayage trip: dispatch approves and hands
+// the driver an advance before departure, the driver returns with fuel/toll
+// receipts, and finance reconciles actual cost against a per-vehicle fuel
+// benchmark to settle the difference. One of each per Shipment.
+
+// Approved before the trip departs (flowchart stage 2: "เบิกเงินทดรองจ่าย").
+model DriverAdvance {
+  id         String   @id @default(uuid())
+  orgId      String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipmentId String   @unique
+  driver     Driver?  @relation(fields: [driverId], references: [id])
+  driverId   String?
+
+  fuelEstimateCents      Int @default(0)
+  tollEstimateCents      Int @default(0)
+  allowanceCents         Int @default(0) // per-diem, defaults from Driver.standardAllowanceCents
+  totalAdvanceCents      Int // fuelEstimate + tollEstimate + allowance
+
+  transferMethod String    @default("cash") // cash | transfer
+  status         String    @default("pending") // pending, approved, transferred
+  approvedBy     String?
+  approvedAt     DateTime?
+  transferredAt  DateTime?
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([driverId])
+}
+
+// One fuel receipt the driver submits after the trip (flowchart stage 3:
+// "คนขับนำส่งบิล/สลิปจริงหลังจบ"). A trip may have more than one fill-up.
+model FuelTransaction {
+  id         String   @id @default(uuid())
+  orgId      String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipmentId String
+
+  liters              Float
+  pricePerLiterCents  Int
+  totalCostCents      Int
+  odometerKm          Float?
+  purchasedAt         DateTime @default(now())
+  createdAt           DateTime @default(now())
+
+  @@index([orgId])
+  @@index([shipmentId])
+}
+
+// Finance's reconciliation of a trip (flowchart stage 3: benchmark fuel calc,
+// compare to actual, settle the difference). Expected fuel cost follows this
+// project's reading of the source requirement: distanceKm / kmPerLiter *
+// dieselPrice — verify the benchmark and the 10% variance threshold against
+// current company policy before relying on this for real payroll deductions.
+model TripSettlement {
+  id         String   @id @default(uuid())
+  orgId      String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipmentId String   @unique
+  driver     Driver?  @relation(fields: [driverId], references: [id])
+  driverId   String?
+
+  // Inputs the settlement was computed from
+  distanceKm              Float
+  vehicleKmPerLiter        Float // snapshot of the benchmark used (Vehicle.standardKmPerLiter or company default)
+  dieselPriceCentsPerLiter Int
+
+  expectedFuelCostCents Int // distanceKm / vehicleKmPerLiter * dieselPriceCentsPerLiter
+  actualFuelCostCents   Int // sum of this trip's FuelTransactions
+  actualTollCents       Int @default(0)
+  allowanceCents        Int @default(0)
+
+  // (actualFuelCostCents - expectedFuelCostCents) / expectedFuelCostCents * 100
+  fuelVariancePercent Float
+  // true when fuelVariancePercent exceeds the 10% company policy threshold
+  isOverBenchmark     Boolean @default(false)
+
+  totalAdvanceCents     Int // from DriverAdvance.totalAdvanceCents
+  totalActualCostCents  Int // actualFuelCostCents + actualTollCents + allowanceCents
+  // totalAdvanceCents - totalActualCostCents: positive = driver returns cash
+  // to the company, negative = the company tops up the driver.
+  netSettlementCents    Int
+
+  status     String    @default("pending") // pending, settled
+  settledBy  String?
+  settledAt  DateTime?
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([driverId])
+  @@index([status])
 }
