@@ -3,6 +3,7 @@ import { PgBossEventBus } from '../../events/PgBossEventBus.js';
 import { EVENT_TYPES } from '../../events/eventTypes.js';
 import { BaseCommandHandler, TransactionClient, EmitFn } from '../BaseCommandHandler.js';
 import { Command } from '../types.js';
+import { calculateThaiTax, isThaiTaxApplicable } from '../../services/thaiTax/calculator.js';
 
 export interface CreateInvoicePayload {
   customerId: string;
@@ -48,8 +49,27 @@ export class CreateInvoiceCommandHandler extends BaseCommandHandler<CreateInvoic
     }
 
     const subtotalCents = charges.reduce((sum: number, c: any) => sum + c.amountCents, 0);
-    const totalCents = subtotalCents;
     const currency = charges[0].currency;
+
+    // Thai container drayage (Sprint 2): VAT 7% + WHT 1% for THB invoices.
+    // totalCents/balanceCents track the net amount the customer actually
+    // transfers (post-WHT) — see the schema comment on Invoice.vatCents.
+    const thaiTax = isThaiTaxApplicable(currency)
+      ? calculateThaiTax(subtotalCents)
+      : { vatCents: 0, whtCents: 0, netPayableCents: subtotalCents };
+    const totalCents = thaiTax.netPayableCents;
+
+    // Denormalize each shipment's container number onto its line items, so an
+    // invoice keeps showing which container it billed even if the shipment's
+    // container assignment changes later.
+    const shipmentIdsForCharges = [...new Set(charges.map((c: any) => c.shipmentId).filter(Boolean) as string[])];
+    const shipmentsWithContainers = await tx.shipment.findMany({
+      where: { id: { in: shipmentIdsForCharges } },
+      select: { id: true, shippingContainer: { select: { containerNumber: true } } },
+    });
+    const containerNumberByShipmentId = new Map(
+      shipmentsWithContainers.map((s: any) => [s.id, s.shippingContainer?.containerNumber ?? null]),
+    );
 
     // Generate invoice number
     const today = new Date();
@@ -75,7 +95,10 @@ export class CreateInvoiceCommandHandler extends BaseCommandHandler<CreateInvoic
         customerId: payload.customerId,
         status: 'draft',
         subtotalCents,
-        taxCents: 0,
+        taxCents: thaiTax.vatCents,
+        vatCents: thaiTax.vatCents,
+        whtCents: thaiTax.whtCents,
+        netPayableCents: thaiTax.netPayableCents,
         totalCents,
         paidCents: 0,
         balanceCents: totalCents,
@@ -98,6 +121,7 @@ export class CreateInvoiceCommandHandler extends BaseCommandHandler<CreateInvoic
             totalCents: charge.amountCents,
             currency: charge.currency,
             freightClass: charge.freightClass,
+            containerNumber: charge.shipmentId ? containerNumberByShipmentId.get(charge.shipmentId) ?? null : null,
           })),
         },
       },

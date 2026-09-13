@@ -1,4 +1,4 @@
-import { PrismaClient, Invoice, InvoiceLineItem, Payment } from '@prisma/client';
+import { PrismaClient, Invoice, InvoiceLineItem, Payment, WithholdingTaxCertificate } from '@prisma/client';
 
 // ─── DTOs ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +58,7 @@ export type InvoiceWithLineItems = Invoice & {
   lineItems: InvoiceLineItem[];
   payments: Payment[];
   customer: { id: string; name: string; contactEmail: string | null; billingEmail: string | null };
+  withholdingCertificate: WithholdingTaxCertificate | null;
 };
 
 // ─── Interface ──────────────────────────────────────────────────────────────
@@ -86,6 +87,7 @@ export class InvoiceRepository implements IInvoiceRepository {
   private readonly includeRelations = {
     lineItems: true,
     payments: true,
+    withholdingCertificate: true,
     customer: {
       select: { id: true, name: true, contactEmail: true, billingEmail: true },
     },

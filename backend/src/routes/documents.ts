@@ -491,6 +491,52 @@ export async function documentRoutes(server: FastifyInstance) {
     }
   });
 
+  server.post('/api/v1/documents/invoice-pdf', {
+    preHandler: requirePermission('documents:generate'),
+    schema: {
+      description: 'Generate an invoice PDF (shows the Thai VAT/WHT breakdown when applicable)',
+      tags: ['Documents'],
+      body: {
+        type: 'object',
+        required: ['invoiceId'],
+        properties: { invoiceId: { type: 'string' } },
+      },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { invoiceId } = (req as any).body;
+    try {
+      const result = await docService.generateInvoicePdf(invoiceId, (req as any).user?.sub);
+      reply.code(201);
+      return { data: result, error: null };
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
+  server.post('/api/v1/documents/withholding-certificate-pdf', {
+    preHandler: requirePermission('documents:generate'),
+    schema: {
+      description: 'Generate the PDF for an invoice\'s withholding tax certificate (50 ทวิ) — the certificate must already be issued',
+      tags: ['Documents'],
+      body: {
+        type: 'object',
+        required: ['invoiceId'],
+        properties: { invoiceId: { type: 'string' } },
+      },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { invoiceId } = (req as any).body;
+    try {
+      const result = await docService.generateWithholdingCertificatePdf(invoiceId, (req as any).user?.sub);
+      reply.code(201);
+      return { data: result, error: null };
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
   // ── Async generation variants ─────────────────────────────────────────
   // These return 202 + a correlationId immediately and let a background
   // worker render the PDF. Clients poll

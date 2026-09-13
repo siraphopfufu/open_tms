@@ -16,6 +16,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { createHmac, randomBytes } from 'crypto';
 import { seedSystemRoles } from '../auth/seedRoles.js';
+import { calculateThaiTax } from '../services/thaiTax/calculator.js';
 
 const prisma = new PrismaClient();
 const NO_WIPE = process.argv.includes('--no-wipe');
@@ -206,6 +207,9 @@ async function seedOrganization() {
     data: {
       name: 'Meridian Global Logistics',
       organizationType: '3pl',
+      // Thai finance (Sprint 2): our own Revenue Department tax ID, printed on
+      // invoices and as the payee ID on withholding tax certificates. Demo value.
+      taxId: '0105561012345',
       mcNumber: 'MC-872341',
       bondAmountCents: 7500000,
       bondExpirationDate: daysFromNow(365),
@@ -2994,6 +2998,111 @@ async function seedShippingContainers(shipments: any[], locations: any[], orgId:
   return containers;
 }
 
+// Thai finance & withholding tax (Sprint 2): a THB customer, a completed
+// container trip billed to them, and the resulting invoice + 50-Tawi
+// certificate — so the VAT/WHT engine is visible without manual setup.
+async function seedThaiFinanceDemo(orgId: string, locations: any[], shippingContainers: any[]) {
+  const byName = (name: string) => locations.find((l) => l.name === name);
+  const terminalB3 = byName('Laem Chabang Terminal B3 (LCIT)');
+  const kerryDepot = byName('Kerry Depot - Laem Chabang');
+
+  const customer = await prisma.customer.create({
+    data: {
+      orgId,
+      name: 'Boonchai Transport Customer Co., Ltd.',
+      contactEmail: 'ap@boonchai-customer.demo',
+      currency: 'THB',
+      taxId: '0105558009876', // demo value
+      paymentTermsDays: 15, // Thai credit terms are commonly 15 or 30 days
+      billingAddress1: '99 Sukhumvit Road',
+      billingCity: 'Bangkok',
+      billingPostalCode: '10110',
+      billingCountry: 'Thailand',
+    },
+  });
+
+  const shipment = await prisma.shipment.create({
+    data: {
+      orgId,
+      reference: 'SHP-TH-00001',
+      status: 'complete',
+      customerId: customer.id,
+      originId: kerryDepot?.id,
+      destinationId: terminalB3?.id,
+      serviceLevel: 'FTL',
+      pickupDate: daysAgo(3),
+      deliveryDate: daysAgo(1),
+      shippingContainerId: shippingContainers[2]?.id, // COSU1122339, 40GP
+    },
+  });
+
+  const freightChargeCents = 1_500_000; // ฿15,000.00
+  const charge = await prisma.charge.create({
+    data: {
+      orgId,
+      shipmentId: shipment.id,
+      chargeType: 'linehaul',
+      chargeCategory: 'revenue',
+      description: 'Container drayage — Kerry Depot to Laem Chabang Terminal B3',
+      amountCents: freightChargeCents,
+      currency: 'THB',
+      status: 'approved',
+    },
+  });
+
+  const tax = calculateThaiTax(freightChargeCents);
+  const invoice = await prisma.invoice.create({
+    data: {
+      orgId,
+      invoiceNumber: 'INV-TH-20260913-0001',
+      customerId: customer.id,
+      status: 'approved',
+      subtotalCents: tax.subtotalCents,
+      taxCents: tax.vatCents,
+      vatCents: tax.vatCents,
+      whtCents: tax.whtCents,
+      netPayableCents: tax.netPayableCents,
+      totalCents: tax.netPayableCents,
+      balanceCents: tax.netPayableCents,
+      currency: 'THB',
+      paymentTermsDays: customer.paymentTermsDays,
+      issueDate: daysAgo(1),
+      dueDate: daysFromNow(14),
+      lineItems: {
+        create: [{
+          shipmentId: shipment.id,
+          chargeId: charge.id,
+          chargeType: charge.chargeType,
+          description: charge.description,
+          unitPriceCents: charge.amountCents,
+          totalCents: charge.amountCents,
+          currency: 'THB',
+          containerNumber: shippingContainers[2]?.containerNumber,
+        }],
+      },
+    },
+  });
+  await prisma.charge.update({ where: { id: charge.id }, data: { status: 'invoiced' } });
+
+  const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { name: true, taxId: true } });
+  await prisma.withholdingTaxCertificate.create({
+    data: {
+      orgId,
+      invoiceId: invoice.id,
+      certificateNumber: '50T-202609-0001',
+      payerName: customer.name,
+      payerTaxId: customer.taxId,
+      payeeName: org.name,
+      payeeTaxId: org.taxId,
+      withholdingType: 'pnd53',
+      taxableAmountCents: tax.subtotalCents,
+      witheldAmountCents: tax.whtCents,
+    },
+  });
+
+  return { customer, invoice };
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -3060,6 +3169,10 @@ async function main() {
   console.log('Seeding shipping containers + EIR/weight tickets (Thai drayage)...');
   const shippingContainers = await seedShippingContainers(shipmentRecords, locations, org.id);
   console.log(`✓ Shipping containers: ${shippingContainers.length}`);
+
+  console.log('Seeding Thai finance demo (THB customer, invoice, WHT certificate)...');
+  const thaiFinance = await seedThaiFinanceDemo(org.id, locations, shippingContainers);
+  console.log(`✓ Thai invoice: ${thaiFinance.invoice.invoiceNumber}`);
 
   // Most shipments are still fresh drafts with no carrier/lane/tracking, so
   // the remaining in-flight demo seeders (tenders, charges, AR/AP invoices)

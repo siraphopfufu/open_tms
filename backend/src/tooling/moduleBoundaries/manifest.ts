@@ -101,6 +101,7 @@ export const PATH_RULES: readonly PathRule[] = [
 
   // --- finance ---
   { pattern: /^(routes|commands|services|repositories|workers|events\/(projections|handlers))\/.*(invoic|charge|commission|financial|payment|billing|margin|freightAudit|creditCheck)/i, module: 'finance' },
+  { pattern: /^services\/thaiTax\//, module: 'finance', note: 'VAT/WHT calculation and BahtText formatting feed invoice generation' },
 
   // --- inventory ---
   { pattern: /^(routes|commands|services|repositories)\/.*(inventory|productUom|unitConversion)/i, module: 'inventory' },

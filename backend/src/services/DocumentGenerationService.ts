@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import Handlebars from 'handlebars';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { IDocumentTemplateRepository } from '../repositories/DocumentTemplateRepository.js';
 import { IGeneratedDocumentRepository, CreateGeneratedDocumentDTO } from '../repositories/GeneratedDocumentRepository.js';
 import { IBinaryStorageProvider } from '../storage/IBinaryStorageProvider.js';
@@ -9,18 +13,35 @@ import { defaultBolTemplate } from './templates/bolTemplate.js';
 import { defaultLabelTemplate } from './templates/labelTemplate.js';
 import { defaultCustomsTemplate } from './templates/customsTemplate.js';
 import { defaultRateConfirmationTemplate } from './templates/rateConfirmationTemplate.js';
+import { defaultInvoiceTemplate } from './templates/invoiceTemplate.js';
+import { defaultWithholdingCertificateTemplate } from './templates/withholdingCertificateTemplate.js';
 import { mapCustomsLineItem, totalDeclaredValueFor } from './customs/customsLineItemMapping.js';
+import { toBahtText } from './thaiTax/bahtText.js';
 
 export interface IDocumentGenerationService {
   generateBOL(shipmentId: string, templateId?: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateLabels(orderId: string, templateId?: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateCustomsForm(shipmentId: string, templateId?: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateRateConfirmation(shipmentId: string, userId?: string): Promise<{ id: string; fileName: string }>;
+  generateInvoicePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
+  generateWithholdingCertificatePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
 }
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return '';
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+// Thai script block, incl. the Thai currency symbol.
+const THAI_RANGE = /[฀-๿]/;
+
+let thaiFontBytesCache: Buffer | null = null;
+function loadThaiFontBytes(): Buffer {
+  if (!thaiFontBytesCache) {
+    const here = dirname(fileURLToPath(import.meta.url));
+    thaiFontBytesCache = readFileSync(join(here, '../../assets/fonts/NotoSansThai.ttf'));
+  }
+  return thaiFontBytesCache;
 }
 
 /**
@@ -376,6 +397,109 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     return { id: doc.id, fileName };
   }
 
+  async generateInvoicePdf(invoiceId: string, userId?: string) {
+    const invoice = await this.prisma.invoice.findUniqueOrThrow({
+      where: { id: invoiceId },
+      include: { lineItems: true, customer: true },
+    });
+
+    const branding = await this.loadBranding();
+    const org = await this.prisma.organization.findFirst({ select: { taxId: true } });
+
+    const hasThaiTax = invoice.vatCents > 0 || invoice.whtCents > 0;
+    const currencySymbol = invoice.currency === 'THB' ? '฿' : '$';
+
+    const data = {
+      branding,
+      org: { taxId: org?.taxId },
+      invoiceNumber: invoice.invoiceNumber,
+      issueDate: formatDate(invoice.issueDate),
+      dueDate: formatDate(invoice.dueDate),
+      customer: invoice.customer,
+      currencySymbol,
+      hasThaiTax,
+      lineItems: invoice.lineItems.map(li => ({
+        description: li.description,
+        containerNumber: li.containerNumber ?? '',
+        amount: (li.totalCents / 100).toFixed(2),
+      })),
+      subtotal: (invoice.subtotalCents / 100).toFixed(2),
+      vat: (invoice.vatCents / 100).toFixed(2),
+      wht: (invoice.whtCents / 100).toFixed(2),
+      netPayable: (invoice.netPayableCents / 100).toFixed(2),
+      netPayableBahtText: invoice.currency === 'THB' ? toBahtText(invoice.netPayableCents / 100) : null,
+      notes: invoice.notes,
+      paymentTermsDays: invoice.paymentTermsDays,
+    };
+
+    const html = Handlebars.compile(defaultInvoiceTemplate)(data);
+    const pdfBytes = await this.htmlToPdf(html, `Invoice - ${invoice.invoiceNumber}`);
+
+    const fileName = `Invoice-${invoice.invoiceNumber}.pdf`;
+    const buffer = Buffer.from(pdfBytes);
+    const storageKey = `files/${randomUUID()}`;
+
+    const doc = await this.storeDocument({
+      documentType: 'invoice',
+      fileName,
+      mimeType: 'application/pdf',
+      fileSize: pdfBytes.length,
+      fileContent: buffer,
+      customerId: invoice.customerId,
+      generatedBy: userId,
+      metadata: data,
+    }, storageKey);
+
+    return { id: doc.id, fileName };
+  }
+
+  async generateWithholdingCertificatePdf(invoiceId: string, userId?: string) {
+    const invoice = await this.prisma.invoice.findUniqueOrThrow({
+      where: { id: invoiceId },
+      include: { withholdingCertificate: true, customer: true },
+    });
+    const cert = invoice.withholdingCertificate;
+    if (!cert) throw new Error('No withholding tax certificate has been issued for this invoice yet');
+
+    const branding = await this.loadBranding();
+
+    const data = {
+      branding,
+      certificateNumber: cert.certificateNumber,
+      issueDate: formatDate(cert.issueDate),
+      formLabel: cert.withholdingType === 'pnd3' ? 'ภ.ง.ด. 3' : 'ภ.ง.ด. 53',
+      payerName: cert.payerName,
+      payerTaxId: cert.payerTaxId,
+      payeeName: cert.payeeName,
+      payeeTaxId: cert.payeeTaxId,
+      incomeDescription: cert.incomeDescription,
+      invoiceNumber: invoice.invoiceNumber,
+      taxableAmount: (cert.taxableAmountCents / 100).toFixed(2),
+      witheldAmount: (cert.witheldAmountCents / 100).toFixed(2),
+      witheldAmountBahtText: toBahtText(cert.witheldAmountCents / 100),
+    };
+
+    const html = Handlebars.compile(defaultWithholdingCertificateTemplate)(data);
+    const pdfBytes = await this.htmlToPdf(html, `Withholding Tax Certificate - ${cert.certificateNumber}`);
+
+    const fileName = `WHT-Certificate-${cert.certificateNumber}.pdf`;
+    const buffer = Buffer.from(pdfBytes);
+    const storageKey = `files/${randomUUID()}`;
+
+    const doc = await this.storeDocument({
+      documentType: 'withholding_certificate',
+      fileName,
+      mimeType: 'application/pdf',
+      fileSize: pdfBytes.length,
+      fileContent: buffer,
+      customerId: invoice.customerId,
+      generatedBy: userId,
+      metadata: data,
+    }, storageKey);
+
+    return { id: doc.id, fileName };
+  }
+
   /**
    * Store document content via IBinaryStorageProvider (if available) or inline in DB.
    * When a storage provider is configured, fileContent is not stored in the DB row.
@@ -443,8 +567,22 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     } catch { /* use fallback */ }
     pdfDoc.setCreator(creatorName);
 
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    // Documents with Thai content (invoices, withholding tax certificates) get
+    // Noto Sans Thai instead of Helvetica — the standard PDF fonts have no
+    // Thai glyphs at all. It covers Latin too, so it's fine as the sole font
+    // for a mixed English/Thai document; there's no embedded bold weight, so
+    // "bold" text just renders at the same weight instead of failing.
+    const needsThaiFont = THAI_RANGE.test(html);
+    let font, boldFont;
+    if (needsThaiFont) {
+      pdfDoc.registerFontkit(fontkit);
+      const thaiFont = await pdfDoc.embedFont(loadThaiFontBytes(), { subset: true });
+      font = thaiFont;
+      boldFont = thaiFont;
+    } else {
+      font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    }
 
     const PW = 612; // US Letter
     const PH = 792;
@@ -456,14 +594,17 @@ export class DocumentGenerationService implements IDocumentGenerationService {
 
     // ── Utilities ──────────────────────────────────────────────────────────
 
-    // Replace characters outside WinAnsi encoding that would crash drawText
+    // Replace characters outside the embedded font's coverage that would
+    // crash drawText. WinAnsi (Helvetica) or WinAnsi + Thai (Noto Sans Thai).
+    const allowedRange = needsThaiFont ? '\\x20-\\x7E\\xA0-\\xFF\\u0E00-\\u0E7F' : '\\x20-\\x7E\\xA0-\\xFF';
+    const disallowed = new RegExp(`[^\\t\\n${allowedRange}]`, 'g');
     const sanitize = (t: string) => t
       .replace(/[\u2018\u2019\u2032]/g, "'")
       .replace(/[\u201C\u201D\u2033]/g, '"')
       .replace(/\u2013/g, '-')
       .replace(/\u2014/g, '--')
       .replace(/\u2026/g, '...')
-      .replace(/[^\t\n\x20-\x7E\xA0-\xFF]/g, '');
+      .replace(disallowed, '');
 
     const stripHtml = (s: string) => sanitize(
       s.replace(/<[^>]+>/g, '')

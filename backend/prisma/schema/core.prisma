@@ -169,6 +169,10 @@ model Organization {
   // Organization Type
   organizationType String @default("shipper") // "shipper" | "broker" | "carrier" | "3pl"
 
+  // Thai tax (Sprint 2): our own 13-digit Revenue Department tax ID, printed
+  // on invoices and as the payee ID on withholding tax certificates we receive.
+  taxId String?
+
   // Broker-Specific Fields
   mcNumber                 String? // Motor Carrier number
   bondAmountCents          Int? // Bond amount in cents

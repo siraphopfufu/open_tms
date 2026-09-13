@@ -14,6 +14,8 @@ function build(loadPlan: { id: string; bolDocumentId: string | null } | null = {
     generateLabels: jest.fn(),
     generateCustomsForm: jest.fn(),
     generateRateConfirmation: jest.fn(),
+    generateInvoicePdf: jest.fn(),
+    generateWithholdingCertificatePdf: jest.fn(),
   };
   const { bus, fannedOut } = mockEventBus();
 

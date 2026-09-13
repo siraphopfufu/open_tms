@@ -10,6 +10,7 @@ import { SEND_INVOICE, SendInvoicePayload } from '../commands/invoices/SendInvoi
 import { RECORD_PAYMENT, RecordPaymentPayload } from '../commands/invoices/RecordPaymentCommand.js';
 import { VOID_INVOICE, VoidInvoicePayload } from '../commands/invoices/VoidInvoiceCommand.js';
 import { guardWrites } from '../auth/guardWrites.js';
+import { toBahtText } from '../services/thaiTax/bahtText.js';
 
 export async function invoiceRoutes(server: FastifyInstance) {
   const invoiceRepo = container.resolve<IInvoiceRepository>(TOKENS.IInvoiceRepository);
@@ -252,6 +253,82 @@ export async function invoiceRoutes(server: FastifyInstance) {
         return { data: null, error: result.error };
       }
       return { data: result.data, error: null };
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
+  // Issue a 50-Tawi withholding tax certificate for a THB invoice
+  server.post('/api/v1/invoices/:id/withholding-certificate', {
+    schema: {
+      tags: ['Financial - Invoices'],
+      summary: 'Issue a Thai withholding tax certificate (50 ทวิ) for an invoice with WHT withheld',
+      body: {
+        type: 'object',
+        properties: {
+          withholdingType: { type: 'string', enum: ['pnd53', 'pnd3'] },
+        },
+      },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id } = req.params as { id: string };
+    const body = z.object({
+      withholdingType: z.enum(['pnd53', 'pnd3']).optional(),
+    }).parse((req as any).body ?? {});
+
+    try {
+      const invoice = await invoiceRepo.findById(id);
+      if (!invoice) {
+        reply.code(404);
+        return { data: null, error: 'Invoice not found' };
+      }
+      if (invoice.whtCents <= 0) {
+        reply.code(400);
+        return { data: null, error: 'This invoice has no withholding tax to certify' };
+      }
+      if (invoice.withholdingCertificate) {
+        reply.code(409);
+        return { data: null, error: 'A withholding tax certificate already exists for this invoice', certificateId: invoice.withholdingCertificate.id } as any;
+      }
+
+      const prisma = container.resolve<any>(TOKENS.PrismaClient);
+      const [customer, org] = await Promise.all([
+        prisma.customer.findUnique({ where: { id: invoice.customerId }, select: { name: true, taxId: true } }),
+        prisma.organization.findFirst({ select: { name: true, taxId: true } }),
+      ]);
+
+      const today = new Date();
+      const monthStr = today.toISOString().slice(0, 7).replace('-', '');
+      const prefix = `50T-${monthStr}-`;
+      const latest = await prisma.withholdingTaxCertificate.findFirst({
+        where: { orgId: (req as any).orgId ?? '', certificateNumber: { startsWith: prefix } },
+        orderBy: { certificateNumber: 'desc' },
+        select: { certificateNumber: true },
+      });
+      const seq = latest ? parseInt(latest.certificateNumber.slice(prefix.length), 10) + 1 : 1;
+      const certificateNumber = `${prefix}${String(seq).padStart(4, '0')}`;
+
+      const certificate = await prisma.withholdingTaxCertificate.create({
+        data: {
+          orgId: (req as any).orgId ?? '',
+          invoiceId: invoice.id,
+          certificateNumber,
+          payerName: customer?.name ?? 'Unknown',
+          payerTaxId: customer?.taxId ?? null,
+          payeeName: org?.name ?? 'Ather TMS',
+          payeeTaxId: org?.taxId ?? null,
+          withholdingType: body.withholdingType ?? 'pnd53',
+          taxableAmountCents: invoice.subtotalCents,
+          witheldAmountCents: invoice.whtCents,
+        },
+      });
+
+      reply.code(201);
+      return {
+        data: { ...certificate, witheldAmountBahtText: toBahtText(certificate.witheldAmountCents / 100) },
+        error: null,
+      };
     } catch (err: any) {
       reply.code(400);
       return { data: null, error: err.message };

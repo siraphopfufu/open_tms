@@ -113,6 +113,18 @@ model Invoice {
   balanceCents  Int // total - paid
   currency      String @default("USD")
 
+  // Thai tax (Sprint 2): applied when currency is THB. VAT is added on top of
+  // the subtotal; WHT is withheld by the paying customer and remitted to the
+  // Revenue Department on our behalf (see WithholdingTaxCertificate), so the
+  // customer only ever transfers subtotal + VAT - WHT. totalCents is set to
+  // that net amount (matching netPayableCents) so the existing balance/
+  // payment/status logic, which is all keyed off totalCents, keeps working
+  // unchanged — a Thai invoice is "paid" when the net transfer clears, not
+  // when the pre-WHT face value does.
+  vatCents        Int @default(0) // 7% of subtotalCents
+  whtCents        Int @default(0) // 1% of subtotalCents, Section 3 Trez
+  netPayableCents Int @default(0) // subtotalCents + vatCents - whtCents; mirrors totalCents
+
   // Terms
   paymentTermsDays Int      @default(30)
   issueDate        DateTime @default(now())
@@ -130,9 +142,10 @@ model Invoice {
   internalNotes String?
   createdBy     String?
 
-  lineItems   InvoiceLineItem[]
-  payments    Payment[]
-  creditNotes CreditNote[]      @relation("InvoiceCreditNotes")
+  lineItems             InvoiceLineItem[]
+  payments              Payment[]
+  creditNotes           CreditNote[]                @relation("InvoiceCreditNotes")
+  withholdingCertificate WithholdingTaxCertificate?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -166,6 +179,11 @@ model InvoiceLineItem {
   // LTL-specific
   freightClass String?
   weight       Decimal? @db.Decimal(10, 2)
+
+  // Thai container drayage (Sprint 2): denormalized from the shipment's
+  // ShippingContainer at invoice-creation time, so a line item still shows
+  // which container it billed even if the container is later reassigned.
+  containerNumber String?
 
   createdAt DateTime @default(now())
 
@@ -419,6 +437,43 @@ model Commission {
   @@index([userId])
   @@index([shipmentId])
   @@index([status])
+}
+
+// ─── Thai Withholding Tax (Sprint 2) ─────────────────────────────────────────
+// A 50-Tawi certificate (หนังสือรับรองการหักภาษี ณ ที่จ่าย): the paying customer
+// withholds tax from what they owe us and must give us this certificate,
+// which we use to offset our own corporate income tax. One per invoice.
+//
+// NOTE: withholdingType selection (pnd53 for a juristic payee, pnd3 for an
+// individual) follows this project's reading of Section 3 Trez — verify
+// against current Revenue Department guidance and an accountant's sign-off
+// before relying on this for real filings.
+model WithholdingTaxCertificate {
+  id                 String   @id @default(uuid())
+  orgId              String
+  invoice            Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId          String   @unique
+  certificateNumber  String   @unique // 50T-YYYYMM-0001
+
+  // Parties. payerTaxId is the customer (withholder); payeeTaxId is us.
+  payerName   String
+  payerTaxId  String?
+  payeeName   String
+  payeeTaxId  String?
+
+  // pnd53 (payee is a juristic company) | pnd3 (payee is an individual)
+  withholdingType String @default("pnd53")
+  // Revenue Department income-type code for transport service fees under
+  // Section 3 Trez.
+  incomeDescription String @default("ค่าจ้างขนส่ง (มาตรา 3 เตรส)")
+
+  taxableAmountCents Int // the subtotal WHT is calculated on
+  witheldAmountCents Int // 1% of taxableAmountCents
+
+  issueDate DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
 }
 
 // ─── Financial: Invoice Read Model ──────────────────────────────────────────
