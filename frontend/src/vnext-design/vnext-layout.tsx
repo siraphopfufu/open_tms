@@ -154,6 +154,7 @@ const APPS: AppDef[] = [
         { to: '/map', icon: MapIcon, label: 'Map View' },
         { to: '/sla', icon: Timer, label: 'SLA Dashboard' },
         { to: '/shipments', icon: Truck, label: 'Shipments' },
+        { to: '/dispatch', icon: LayoutGrid, label: 'Dispatch Board' },
         { to: '/orders', icon: FileText, label: 'Orders' },
         { to: '/cold-chain/capa', icon: AlertTriangle, label: 'CAPA Reports' },
         { to: '/agent-decisions', icon: Bot, label: 'Agent Decisions' },

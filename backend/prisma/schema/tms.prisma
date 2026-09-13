@@ -358,6 +358,10 @@ model Carrier {
   // what we pay them (see WithholdingTaxCertificate).
   taxId      String?
   nationalId String?
+  // Dispatch decision point (customer process flowchart stage 1): whether
+  // this Carrier represents the company's own trucks (dispatch just picks a
+  // Vehicle/Driver under it) or a subcontractor/รถร่วม being paid per trip.
+  isOwnFleet Boolean @default(false)
 
   // Return label generation (carrier API or manual)
   returnLabelProvider       String? // null = not configured; manual | fedex | ups | dhl

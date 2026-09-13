@@ -34,6 +34,9 @@ export interface CreateCarrierPayload {
   validationNotes?: string;
   validatedAt?: string;
   validatedBy?: string;
+  taxId?: string;
+  nationalId?: string;
+  isOwnFleet?: boolean;
 }
 
 export const CREATE_CARRIER = 'carrier.create';

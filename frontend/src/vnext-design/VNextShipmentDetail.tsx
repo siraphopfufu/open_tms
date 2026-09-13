@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import {
   Activity,
@@ -278,6 +278,245 @@ function FinancialsTab({ shipmentId, hasBol }: { shipmentId: string; hasBol: boo
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Dispatch Tab (customer flowchart stage 1: company fleet vs subcontractor) ───
+function DispatchTab({ shipmentId, load, onAssigned }: { shipmentId: string; load: any; onAssigned: () => void }) {
+  const [carriers, setCarriers] = useState<any[]>([]);
+  const [fleetType, setFleetType] = useState<'own' | 'subcontractor'>('own');
+  const [carrierId, setCarrierId] = useState('');
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [vehicleId, setVehicleId] = useState('');
+  const [driverId, setDriverId] = useState('');
+  const [trailerPlate, setTrailerPlate] = useState(load?.trailerPlate || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const [showNewCarrier, setShowNewCarrier] = useState(false);
+  const [newCarrierName, setNewCarrierName] = useState('');
+  const [newCarrierNationalId, setNewCarrierNationalId] = useState('');
+  const [newCarrierTaxId, setNewCarrierTaxId] = useState('');
+
+  const [newVehiclePlate, setNewVehiclePlate] = useState('');
+  const [newDriverName, setNewDriverName] = useState('');
+  const [newDriverPhone, setNewDriverPhone] = useState('');
+  const [newDriverAllowance, setNewDriverAllowance] = useState('');
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/v1/carriers`).then(r => r.json()).then(j => setCarriers(j.data || [])).catch(() => {});
+  }, []);
+
+  const loadFleetData = useCallback((cid: string) => {
+    if (!cid) { setVehicles([]); setDrivers([]); return; }
+    Promise.all([
+      fetch(`${API_URL}/api/v1/carriers/${cid}/vehicles`).then(r => r.json()),
+      fetch(`${API_URL}/api/v1/carriers/${cid}/drivers`).then(r => r.json()),
+    ]).then(([v, d]) => { setVehicles(v.data || []); setDrivers(d.data || []); }).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadFleetData(carrierId); }, [carrierId, loadFleetData]);
+
+  const filteredCarriers = carriers.filter(c => (fleetType === 'own' ? c.isOwnFleet : !c.isOwnFleet));
+
+  const createCarrier = async () => {
+    if (!newCarrierName.trim()) return;
+    setBusy(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/carriers`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newCarrierName,
+          isOwnFleet: fleetType === 'own',
+          nationalId: newCarrierNationalId || undefined,
+          taxId: newCarrierTaxId || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      const refreshed = await fetch(`${API_URL}/api/v1/carriers`).then(r => r.json());
+      setCarriers(refreshed.data || []);
+      setCarrierId(json.data.id);
+      setShowNewCarrier(false);
+      setNewCarrierName(''); setNewCarrierNationalId(''); setNewCarrierTaxId('');
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const createVehicle = async () => {
+    if (!newVehiclePlate.trim() || !carrierId) return;
+    setBusy(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/carriers/${carrierId}/vehicles`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plate: newVehiclePlate, type: 'tractor' }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setNewVehiclePlate('');
+      loadFleetData(carrierId);
+      setVehicleId(json.data.id);
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const createDriver = async () => {
+    if (!newDriverName.trim() || !carrierId) return;
+    setBusy(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/carriers/${carrierId}/drivers`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newDriverName,
+          phone: newDriverPhone || undefined,
+          standardAllowanceCents: newDriverAllowance ? Math.round(parseFloat(newDriverAllowance) * 100) : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setNewDriverName(''); setNewDriverPhone(''); setNewDriverAllowance('');
+      loadFleetData(carrierId);
+      setDriverId(json.data.id);
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const assign = async () => {
+    setBusy(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/load`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicleId: vehicleId || undefined,
+          driverId: driverId || undefined,
+          trailerPlate: trailerPlate || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      onAssigned();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const selectedDriver = drivers.find(d => d.id === driverId);
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
+
+      {load?.vehicle && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Current Assignment</CardTitle></CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-5 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Fleet</dt>
+                <dd><Badge variant={load.vehicle.carrier?.isOwnFleet ? 'info' : 'warning'}>{load.vehicle.carrier?.isOwnFleet ? 'Company Fleet' : 'Subcontractor'}</Badge></dd>
+              </div>
+              <div><dt className="text-xs text-muted-foreground">Carrier</dt><dd>{load.vehicle.carrier?.name}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Tractor</dt><dd className="font-mono">{load.vehicle.plate}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Trailer</dt><dd className="font-mono">{load.trailerPlate || '-'}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Driver</dt><dd>{load.driver?.name || '-'}</dd></div>
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">{load?.vehicle ? 'Reassign' : 'Assign'} Vehicle & Driver</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button size="sm" variant={fleetType === 'own' ? 'default' : 'outline'} onClick={() => { setFleetType('own'); setCarrierId(''); setVehicleId(''); setDriverId(''); }}>
+              Company Fleet
+            </Button>
+            <Button size="sm" variant={fleetType === 'subcontractor' ? 'default' : 'outline'} onClick={() => { setFleetType('subcontractor'); setCarrierId(''); setVehicleId(''); setDriverId(''); }}>
+              Subcontractor / รถร่วม
+            </Button>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>{fleetType === 'own' ? 'Fleet' : 'Subcontractor'}</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={carrierId} onValueChange={v => setCarrierId(v)}>
+                <SelectTrigger className="w-[260px]"><SelectValue placeholder="Select..." /></SelectTrigger>
+                <SelectContent>
+                  {filteredCarriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="ghost" onClick={() => setShowNewCarrier(!showNewCarrier)}>
+                <Plus className="h-4 w-4" /> New {fleetType === 'own' ? 'fleet carrier' : 'subcontractor'}
+              </Button>
+            </div>
+            {showNewCarrier && (
+              <div className="mt-2 flex flex-wrap items-end gap-3 rounded-md border p-3">
+                <div className="space-y-1.5">
+                  <Label>Name</Label>
+                  <Input value={newCarrierName} onChange={e => setNewCarrierName(e.target.value)} placeholder="สมชาย ขนส่ง" className="w-[200px]" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>National ID (individual)</Label>
+                  <Input value={newCarrierNationalId} onChange={e => setNewCarrierNationalId(e.target.value)} placeholder="1103700123456" className="w-[180px]" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tax ID (company)</Label>
+                  <Input value={newCarrierTaxId} onChange={e => setNewCarrierTaxId(e.target.value)} placeholder="0105561012345" className="w-[180px]" />
+                </div>
+                <Button size="sm" onClick={createCarrier} disabled={busy || !newCarrierName.trim()}>Create</Button>
+              </div>
+            )}
+          </div>
+
+          {carrierId && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Tractor</Label>
+                  <div className="flex items-center gap-2">
+                    <Select value={vehicleId} onValueChange={setVehicleId}>
+                      <SelectTrigger className="w-[180px]"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>
+                        {vehicles.map(v => <SelectItem key={v.id} value={v.id}>{v.plate}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input value={newVehiclePlate} onChange={e => setNewVehiclePlate(e.target.value)} placeholder="70-1234 ชบ." className="w-[140px]" />
+                    <Button size="sm" variant="outline" onClick={createVehicle} disabled={busy || !newVehiclePlate.trim()}>Add</Button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Driver</Label>
+                  <div className="flex items-center gap-2">
+                    <Select value={driverId} onValueChange={setDriverId}>
+                      <SelectTrigger className="w-[180px]"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>
+                        {drivers.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input value={newDriverName} onChange={e => setNewDriverName(e.target.value)} placeholder="สมหมาย ใจดี" className="w-[140px]" />
+                    <Button size="sm" variant="outline" onClick={createDriver} disabled={busy || !newDriverName.trim()}>Add</Button>
+                  </div>
+                  {selectedDriver?.standardAllowanceCents != null && (
+                    <p className="text-xs text-muted-foreground">Standard allowance: ฿{(selectedDriver.standardAllowanceCents / 100).toFixed(2)}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-end gap-3">
+                <div className="space-y-1.5">
+                  <Label>Trailer / Chassis</Label>
+                  <Input value={trailerPlate} onChange={e => setTrailerPlate(e.target.value)} placeholder="70-5678 ชบ." className="w-[180px]" />
+                </div>
+                <Button size="sm" onClick={assign} disabled={busy || (!vehicleId && !driverId && !trailerPlate)}>
+                  {load?.vehicle ? 'Update Assignment' : 'Assign to Trip'}
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -2209,9 +2448,12 @@ function EventsTab({ shipmentId }: { shipmentId: string }) {
 export default function VNextShipmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
-  const [activeTab, setActiveTab] = useState('details');
+  // The Dispatch Board links here with ?tab=dispatch so clicking a shipment
+  // lands directly on its assignment tab instead of Details.
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'details');
   const [shipment, setShipment] = useState<any>(null);
   const [shipmentType, setShipmentType] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -2784,6 +3026,7 @@ export default function VNextShipmentDetail() {
     { value: 'documents', label: 'Docs', Icon: FileText },
     { value: 'financials', label: 'Financials', Icon: CreditCard },
     { value: 'cargo', label: 'Cargo', Icon: Package },
+    { value: 'dispatch', label: 'Dispatch', Icon: Truck },
     { value: 'container', label: 'Container', Icon: Container },
     { value: 'settlement', label: 'Trip Settlement', Icon: Wallet },
     { value: 'telemetry', label: 'Telemetry', Icon: Thermometer },
@@ -3558,6 +3801,10 @@ export default function VNextShipmentDetail() {
 
             <TabsContent value="cargo" className="mt-4">
               <CargoTab shipmentId={id!} />
+            </TabsContent>
+
+            <TabsContent value="dispatch" className="mt-4">
+              <DispatchTab shipmentId={id!} load={shipment.loads?.[0]} onAssigned={loadShipment} />
             </TabsContent>
 
             <TabsContent value="container" className="mt-4">

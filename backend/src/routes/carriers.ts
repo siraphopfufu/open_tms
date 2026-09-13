@@ -92,7 +92,10 @@ export async function carrierRoutes(server: FastifyInstance) {
         complianceChecked: z.boolean().optional(),
         validationNotes: z.string().optional(),
         validatedAt: emptyToUndef(z.string().datetime().optional()),
-        validatedBy: z.string().optional()
+        validatedBy: z.string().optional(),
+        taxId: z.string().optional(),
+        nationalId: z.string().optional(),
+        isOwnFleet: z.boolean().optional(),
       })
       .parse((req as any).body);
 

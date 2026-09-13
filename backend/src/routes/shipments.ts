@@ -288,7 +288,7 @@ export async function shipmentRoutes(server: FastifyInstance) {
           }
         },
         carrier: true,
-        loads: { include: { vehicle: true, driver: true } },
+        loads: { include: { vehicle: { include: { carrier: true } }, driver: true } },
         shippingContainer: true,
         events: { orderBy: { eventTime: 'desc' } },
         deviceAssignments: {

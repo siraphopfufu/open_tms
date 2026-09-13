@@ -3122,7 +3122,7 @@ async function seedThaiFleetSettlementDemo(orgId: string, shipment: any, locatio
   // the existing Carrier/Vehicle/Driver model (Carrier's MC/DOT/SCAC fields
   // are all optional, so this needs none of them).
   const ownFleet = await prisma.carrier.create({
-    data: { orgId, name: 'Boonchai Transport - Own Fleet', country: 'Thailand', currency: 'THB' },
+    data: { orgId, name: 'Boonchai Transport - Own Fleet', country: 'Thailand', currency: 'THB', isOwnFleet: true },
   });
   const ownVehicle = await prisma.vehicle.create({
     data: { orgId, carrierId: ownFleet.id, plate: '70-1234 ชบ.', type: 'tractor', standardKmPerLiter: 3.2 },
