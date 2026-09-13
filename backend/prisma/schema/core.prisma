@@ -103,7 +103,11 @@ model Location {
   updatedAt  DateTime  @updatedAt
 
   // Location classification & metadata
-  locationType         String? // warehouse, distribution_centre, cross_dock, terminal, port, rail_yard, customer, store, manufacturing
+  locationType         String? // warehouse, distribution_centre, cross_dock, terminal, port, rail_yard, customer, store, manufacturing, empty_depot
+  // Thai container drayage: sub-terminal/gate code within a port (e.g. Laem Chabang "B3", "C1")
+  // and the operating company running that terminal or empty depot (e.g. "LCIT", "Hutchison", "Kerry").
+  terminalCode         String?
+  operatorCompany      String?
   facilityCapabilities Json? // { crossDockCapable, hasColdStorage, hasHazmatCert, hasBondedStorage }
   operatingHours       Json? // Per-day schedule: { mon: { open: "08:00", close: "17:00" }, ... }
   appointmentRequired  Boolean @default(false)
@@ -150,6 +154,10 @@ model Location {
   pickTasks             PickTask[]
   packTasks             PackTask[]
   stagingAssignments    StagingAssignment[]
+
+  // Thai container drayage: EIR/weight tickets issued at this port terminal or empty depot
+  eirTickets    EirTicket[]
+  weightTickets WeightTicket[]
 
   @@index([orgId])
 }

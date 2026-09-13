@@ -127,6 +127,13 @@ model Shipment {
   // Public sharing
   shareLinks ShipmentShareLink[]
 
+  // Thai container drayage (Sprint 1): which ISO container this trip moves, plus its
+  // equipment-interchange (EIR) and weighbridge documentation.
+  shippingContainer   ShippingContainer? @relation(fields: [shippingContainerId], references: [id])
+  shippingContainerId String?
+  eirTickets          EirTicket[]
+  weightTickets       WeightTicket[]
+
   @@index([customerId])
   @@index([status])
   @@index([originId])
@@ -2676,4 +2683,78 @@ model ShipmentShareAccess {
   createdAt   DateTime          @default(now())
 
   @@index([shareLinkId, createdAt])
+}
+
+// ─── Thai Container Drayage (Sprint 1) ──────────────────────────────────────
+// Foundation for container-drayage haulage (e.g. Laem Chabang port trucking): the physical
+// ISO shipping container a trip moves, plus the paper trail it generates at the gate and the
+// weighbridge. See tms_evaluation_feedback_report.md section 4 for the source requirements.
+
+// One ISO 6346 shipping container. A container is reused across its life (empty repositioning,
+// multiple loads), so this is independent of any single Shipment — Shipment.shippingContainerId
+// points at whichever container that trip is moving.
+model ShippingContainer {
+  id              String   @id @default(uuid())
+  orgId           String
+  // ISO 6346: 4-letter owner+category code (3 letters + U/J/Z) + 6 digits + 1 check digit,
+  // e.g. "MSKU9082341". Validated server-side — see services/shippingContainers/iso6346.ts.
+  containerNumber String   @unique
+  // 20GP, 40GP, 40HC, 40RF (reefer)
+  sizeType        String
+  sealNumber      String?
+  // empty | laden | discharged
+  status          String   @default("empty")
+  shippingLine    String? // e.g. Maersk, MSC, ONE, Evergreen, COSCO, SITC
+  bookingNumber   String?
+  billOfLadingNo  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shipments Shipment[]
+
+  @@index([orgId])
+  @@index([status])
+}
+
+// Equipment Interchange Receipt: issued when a container is picked up or returned at a
+// port terminal or empty depot (Location.locationType "port" / "terminal" / "empty_depot").
+model EirTicket {
+  id           String   @id @default(uuid())
+  orgId        String
+  shipment     Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipmentId   String
+  ticketNumber String
+  // pickup_empty | return_empty | pickup_laden | return_laden
+  direction    String
+  location     Location? @relation(fields: [locationId], references: [id])
+  locationId   String?
+  issuedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([orgId])
+  @@index([shipmentId])
+}
+
+// Weighbridge slip for a laden container. Thai law caps gross vehicle weight at 50.5t for a
+// standard 6-axle/22-wheel rig — isOverweight flags anything past that so ops can catch it
+// before the truck reaches the highway.
+model WeightTicket {
+  id            String    @id @default(uuid())
+  orgId         String
+  shipment      Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipmentId    String
+  ticketNumber  String?
+  grossWeightKg Float
+  tareWeightKg  Float?
+  // gross - tare when tare is known, else null.
+  netWeightKg   Float?
+  // Thai highway limit: 50,500 kg gross for a 6-axle/22-wheel combination.
+  isOverweight  Boolean   @default(false)
+  location      Location? @relation(fields: [locationId], references: [id])
+  locationId    String?
+  weighedAt     DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+
+  @@index([orgId])
+  @@index([shipmentId])
 }

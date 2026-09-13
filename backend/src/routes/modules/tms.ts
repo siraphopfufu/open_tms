@@ -23,6 +23,7 @@ import { ediImportRoutes } from '../ediImport.js';
 import { carrierTrackingRoutes } from '../carrierTracking.js';
 import { carrierRoutes } from '../carriers.js';
 import { shipmentRoutes } from '../shipments.js';
+import { shippingContainerRoutes } from '../shippingContainers.js';
 import { shipmentShareLinkRoutes } from '../shipmentShareLinks.js';
 import { shipmentTypeRoutes } from '../shipmentTypes.js';
 import { laneRoutes } from '../lanes.js';
@@ -94,6 +95,7 @@ export async function registerTmsPublicRoutes(server: FastifyInstance): Promise<
 export async function registerTmsAuthenticatedRoutes(app: FastifyInstance): Promise<void> {
   await app.register(carrierRoutes);
   await app.register(shipmentRoutes);
+  await app.register(shippingContainerRoutes);
   await app.register(shipmentShareLinkRoutes);
   await app.register(shipmentTypeRoutes);
   await app.register(laneRoutes);

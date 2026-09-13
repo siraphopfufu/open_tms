@@ -629,6 +629,135 @@ async function seedLocations(orgId: string) {
       lng: -122.3351,
       locationType: 'store',
     },
+    // Thai container drayage (Sprint 1): Laem Chabang port sub-terminals, Bangkok's Khlong
+    // Toei port, and the ICD dry port at Lat Krabang, plus empty container depots. See
+    // tms_evaluation_feedback_report.md section 4.1/4.3.
+    {
+      name: 'Laem Chabang Terminal A0 (Hutchison)',
+      address1: 'Laem Chabang Port',
+      city: 'Laem Chabang',
+      state: 'Chonburi',
+      postalCode: '20110',
+      country: 'Thailand',
+      lat: 13.0955,
+      lng: 100.8917,
+      locationType: 'port',
+      terminalCode: 'A0',
+      operatorCompany: 'Hutchison Ports Thailand',
+    },
+    {
+      name: 'Laem Chabang Terminal B3 (LCIT)',
+      address1: 'Laem Chabang Port',
+      city: 'Laem Chabang',
+      state: 'Chonburi',
+      postalCode: '20110',
+      country: 'Thailand',
+      lat: 13.0871,
+      lng: 100.8834,
+      locationType: 'port',
+      terminalCode: 'B3',
+      operatorCompany: 'LCIT',
+    },
+    {
+      name: 'Laem Chabang Terminal C1 (TIPS)',
+      address1: 'Laem Chabang Port',
+      city: 'Laem Chabang',
+      state: 'Chonburi',
+      postalCode: '20110',
+      country: 'Thailand',
+      lat: 13.0798,
+      lng: 100.8759,
+      locationType: 'port',
+      terminalCode: 'C1',
+      operatorCompany: 'TIPS',
+    },
+    {
+      name: 'Laem Chabang Terminal D1',
+      address1: 'Laem Chabang Port',
+      city: 'Laem Chabang',
+      state: 'Chonburi',
+      postalCode: '20110',
+      country: 'Thailand',
+      lat: 13.0724,
+      lng: 100.8688,
+      locationType: 'port',
+      terminalCode: 'D1',
+      operatorCompany: 'GPC (Goodman)',
+    },
+    {
+      name: 'ICD Lat Krabang',
+      address1: 'ICD Lat Krabang',
+      city: 'Bangkok',
+      state: 'Bangkok',
+      postalCode: '10520',
+      country: 'Thailand',
+      lat: 13.7280,
+      lng: 100.7469,
+      locationType: 'port',
+      terminalCode: 'ICD-LKB',
+      operatorCompany: 'SRT (State Railway of Thailand)',
+    },
+    {
+      name: 'Khlong Toei Port',
+      address1: 'Khlong Toei Port',
+      city: 'Bangkok',
+      state: 'Bangkok',
+      postalCode: '10110',
+      country: 'Thailand',
+      lat: 13.7050,
+      lng: 100.5750,
+      locationType: 'port',
+      terminalCode: 'BKK',
+      operatorCompany: 'Port Authority of Thailand',
+    },
+    {
+      name: 'Kerry Depot - Laem Chabang',
+      address1: 'Kerry Siam Seaport',
+      city: 'Laem Chabang',
+      state: 'Chonburi',
+      postalCode: '20110',
+      country: 'Thailand',
+      lat: 13.1015,
+      lng: 100.9102,
+      locationType: 'empty_depot',
+      operatorCompany: 'Kerry Logistics',
+    },
+    {
+      name: 'TIF Depot - Laem Chabang',
+      address1: 'Thai International Freight Depot',
+      city: 'Laem Chabang',
+      state: 'Chonburi',
+      postalCode: '20110',
+      country: 'Thailand',
+      lat: 13.0912,
+      lng: 100.9021,
+      locationType: 'empty_depot',
+      operatorCompany: 'TIF',
+    },
+    {
+      name: 'Siam Shoreside Depot',
+      address1: 'Siam Shoreside Container Yard',
+      city: 'Laem Chabang',
+      state: 'Chonburi',
+      postalCode: '20110',
+      country: 'Thailand',
+      lat: 13.0842,
+      lng: 100.9187,
+      locationType: 'empty_depot',
+      operatorCompany: 'Siam Shoreside',
+    },
+    {
+      name: 'Mondon Depot',
+      address1: 'Mondon Container Yard',
+      city: 'Laem Chabang',
+      state: 'Chonburi',
+      postalCode: '20110',
+      country: 'Thailand',
+      lat: 13.0693,
+      lng: 100.9256,
+      locationType: 'empty_depot',
+      operatorCompany: 'Mondon',
+    },
   ];
 
   const created = [];
@@ -2771,6 +2900,100 @@ async function backfillReadModels(orgId: string) {
   }
 }
 
+// Thai container drayage (Sprint 1): a handful of ISO 6346-valid containers, attached to a
+// couple of demo shipments with an EIR pickup ticket and a weighbridge slip so the feature is
+// visible without manual setup. Container numbers below are real, checksum-valid ISO 6346.
+async function seedShippingContainers(shipments: any[], locations: any[], orgId: string) {
+  const byName = (name: string) => locations.find((l) => l.name === name);
+  const kerryDepot = byName('Kerry Depot - Laem Chabang');
+  const terminalB3 = byName('Laem Chabang Terminal B3 (LCIT)');
+  const terminalC1 = byName('Laem Chabang Terminal C1 (TIPS)');
+
+  const containers = await Promise.all([
+    prisma.shippingContainer.create({
+      data: {
+        orgId,
+        containerNumber: 'MSCU4455663',
+        sizeType: '20GP',
+        sealNumber: 'ML-TH092144',
+        status: 'laden',
+        shippingLine: 'MSC',
+        bookingNumber: 'BKG-2026-00142',
+      },
+    }),
+    prisma.shippingContainer.create({
+      data: {
+        orgId,
+        containerNumber: 'MAEU7788993',
+        sizeType: '40HC',
+        sealNumber: 'ML-TH092211',
+        status: 'laden',
+        shippingLine: 'Maersk',
+        bookingNumber: 'BKG-2026-00187',
+      },
+    }),
+    prisma.shippingContainer.create({
+      data: { orgId, containerNumber: 'COSU1122339', sizeType: '40GP', status: 'empty', shippingLine: 'COSCO' },
+    }),
+    prisma.shippingContainer.create({
+      data: { orgId, containerNumber: 'TIFU6600114', sizeType: '40RF', status: 'empty', shippingLine: 'Evergreen' },
+    }),
+  ]);
+
+  const [container1, container2] = containers;
+  const [shipment1, shipment2] = shipments.map((s) => s.shipment);
+
+  if (shipment1 && container1) {
+    await prisma.shipment.update({ where: { id: shipment1.id }, data: { shippingContainerId: container1.id } });
+    if (kerryDepot) {
+      await prisma.eirTicket.create({
+        data: {
+          orgId,
+          shipmentId: shipment1.id,
+          ticketNumber: 'EIR-2026-08841',
+          direction: 'pickup_empty',
+          locationId: kerryDepot.id,
+        },
+      });
+    }
+    if (terminalB3) {
+      await prisma.weightTicket.create({
+        data: {
+          orgId,
+          shipmentId: shipment1.id,
+          ticketNumber: 'WB-2026-15522',
+          grossWeightKg: 28450,
+          tareWeightKg: 4200,
+          netWeightKg: 24250,
+          isOverweight: false,
+          locationId: terminalB3.id,
+        },
+      });
+    }
+  }
+
+  if (shipment2 && container2) {
+    await prisma.shipment.update({ where: { id: shipment2.id }, data: { shippingContainerId: container2.id } });
+    if (terminalC1) {
+      // Deliberately over the 50,500kg Thai highway limit, to demonstrate the overweight flag.
+      await prisma.weightTicket.create({
+        data: {
+          orgId,
+          shipmentId: shipment2.id,
+          ticketNumber: 'WB-2026-15589',
+          grossWeightKg: 51200,
+          tareWeightKg: 4500,
+          netWeightKg: 46700,
+          isOverweight: true,
+          locationId: terminalC1.id,
+        },
+      });
+    }
+  }
+
+  return containers;
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -2833,6 +3056,10 @@ async function main() {
   console.log('Seeding devices + sensor readings for in-progress shipments...');
   const devices = await seedDevices(shipmentRecords, org.id);
   console.log(`✓ Devices: ${devices.length}`);
+
+  console.log('Seeding shipping containers + EIR/weight tickets (Thai drayage)...');
+  const shippingContainers = await seedShippingContainers(shipmentRecords, locations, org.id);
+  console.log(`✓ Shipping containers: ${shippingContainers.length}`);
 
   // Most shipments are still fresh drafts with no carrier/lane/tracking, so
   // the remaining in-flight demo seeders (tenders, charges, AR/AP invoices)
