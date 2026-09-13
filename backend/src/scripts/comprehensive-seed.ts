@@ -98,6 +98,7 @@ async function wipe() {
   await prisma.invoiceReadModel.deleteMany();
   await prisma.creditNote.deleteMany();
   await prisma.financialQuery.deleteMany();
+  await prisma.withholdingTaxCertificate.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.carrierInvoiceLineItem.deleteMany();
   await prisma.carrierInvoice.deleteMany();
@@ -133,8 +134,11 @@ async function wipe() {
   await prisma.orderShipment.deleteMany();
   await prisma.shipmentStop.deleteMany();
   await prisma.shipmentReadModel.deleteMany();
+  await prisma.eirTicket.deleteMany();
+  await prisma.weightTicket.deleteMany();
   await prisma.shipment.deleteMany();
   await prisma.shipmentType.deleteMany();
+  await prisma.shippingContainer.deleteMany();
 
   await prisma.pendingLaneRequest.deleteMany();
   await prisma.orderReadModel.deleteMany();
