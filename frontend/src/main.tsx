@@ -16,6 +16,7 @@ import VNextLayout from './vnext-design/vnext-layout';
 import VNextDashboard from './vnext-design/VNextDashboard';
 import VNextShipments from './vnext-design/VNextShipments';
 import VNextDispatchBoard from './vnext-design/VNextDispatchBoard';
+import VNextCashDesk from './vnext-design/VNextCashDesk';
 import VNextShipmentDetail from './vnext-design/VNextShipmentDetail';
 import VNextOrders from './vnext-design/VNextOrders';
 import VNextIssueDetail from './vnext-design/VNextIssueDetail';
@@ -315,6 +316,7 @@ root.render(
           <Route path="shipments/:id/edit" element={<VNextCreateShipment />} />
           <Route path="shipments/:id" element={<VNextShipmentDetail />} />
           <Route path="dispatch" element={<VNextDispatchBoard />} />
+          <Route path="cash-desk" element={<VNextCashDesk />} />
 
           {/* Orders */}
           <Route path="orders" element={<VNextOrders />} />

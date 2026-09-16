@@ -243,6 +243,7 @@ export default function VNextCreateLocation() {
                 <SelectValue placeholder="Select country..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="TH">Thailand</SelectItem>
                 <SelectItem value="US">United States</SelectItem>
                 <SelectItem value="CA">Canada</SelectItem>
                 <SelectItem value="MX">Mexico</SelectItem>

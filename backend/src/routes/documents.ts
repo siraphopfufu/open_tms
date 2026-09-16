@@ -537,6 +537,29 @@ export async function documentRoutes(server: FastifyInstance) {
     }
   });
 
+  server.post('/api/v1/documents/job-sheet-pdf', {
+    preHandler: requirePermission('documents:generate'),
+    schema: {
+      description: 'Generate the A4 driver job sheet for a dispatched shipment (tractor/trailer, driver, booking/container/seal, route, cash advance)',
+      tags: ['Documents'],
+      body: {
+        type: 'object',
+        required: ['shipmentId'],
+        properties: { shipmentId: { type: 'string' } },
+      },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { shipmentId } = (req as any).body;
+    try {
+      const result = await docService.generateJobSheetPdf(shipmentId, (req as any).user?.sub);
+      reply.code(201);
+      return { data: result, error: null };
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
   // ── Async generation variants ─────────────────────────────────────────
   // These return 202 + a correlationId immediately and let a background
   // worker render the PDF. Clients poll

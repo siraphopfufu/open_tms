@@ -405,6 +405,29 @@ function DispatchTab({ shipmentId, load, onAssigned }: { shipmentId: string; loa
 
   const selectedDriver = drivers.find(d => d.id === driverId);
 
+  const [printingJobSheet, setPrintingJobSheet] = useState(false);
+  const printJobSheet = async () => {
+    setPrintingJobSheet(true);
+    setError('');
+    try {
+      const genRes = await fetch(`${API_URL}/api/v1/documents/job-sheet-pdf`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipmentId }),
+      });
+      const genJson = await genRes.json();
+      if (genJson.error) throw new Error(genJson.error);
+      const dlRes = await fetch(`${API_URL}/api/v1/documents/${genJson.data.id}/download`);
+      const blob = await dlRes.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = genJson.data.fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) { setError(e.message); }
+    finally { setPrintingJobSheet(false); }
+  };
+
   return (
     <div className="space-y-4">
       {error && (
@@ -413,7 +436,12 @@ function DispatchTab({ shipmentId, load, onAssigned }: { shipmentId: string; loa
 
       {load?.vehicle && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Current Assignment</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base">Current Assignment</CardTitle>
+            <Button size="sm" variant="outline" onClick={printJobSheet} disabled={printingJobSheet}>
+              {printingJobSheet ? 'Preparing...' : 'Print Job Sheet (A4)'}
+            </Button>
+          </CardHeader>
           <CardContent>
             <dl className="grid grid-cols-2 gap-4 sm:grid-cols-5 text-sm">
               <div>
@@ -537,6 +565,12 @@ function ContainerTab({ shipmentId, container, onAttached }: { shipmentId: strin
   const [newSizeType, setNewSizeType] = useState('40GP');
   const [newSealNumber, setNewSealNumber] = useState('');
   const [newShippingLine, setNewShippingLine] = useState('');
+  const [newBookingNumber, setNewBookingNumber] = useState('');
+
+  // Late container assignment (Must Have #2, "Open Booking"): the job can be
+  // attached with just a size + booking number, and the container number
+  // filled in here once the shipping line assigns one at pickup.
+  const [lateContainerNumber, setLateContainerNumber] = useState('');
 
   const [eirTicketNumber, setEirTicketNumber] = useState('');
   const [eirDirection, setEirDirection] = useState('pickup_empty');
@@ -567,10 +601,11 @@ function ContainerTab({ shipmentId, container, onAttached }: { shipmentId: strin
       const createRes = await fetch(`${API_URL}/api/v1/shipping-containers`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          containerNumber: newContainerNumber,
+          containerNumber: newContainerNumber || undefined,
           sizeType: newSizeType,
           sealNumber: newSealNumber || undefined,
           shippingLine: newShippingLine || undefined,
+          bookingNumber: newBookingNumber || undefined,
         }),
       });
       const created = await createRes.json();
@@ -581,6 +616,23 @@ function ContainerTab({ shipmentId, container, onAttached }: { shipmentId: strin
       });
       const attached = await attachRes.json();
       if (attached.error) throw new Error(attached.error);
+      onAttached();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const fillLateContainerNumber = async () => {
+    if (!container?.id || !lateContainerNumber.trim()) return;
+    setError('');
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/shipping-containers/${container.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ containerNumber: lateContainerNumber }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setLateContainerNumber('');
       onAttached();
     } catch (e: any) { setError(e.message); }
     finally { setBusy(false); }
@@ -629,35 +681,48 @@ function ContainerTab({ shipmentId, container, onAttached }: { shipmentId: strin
         <CardHeader><CardTitle className="text-base">Shipping Container</CardTitle></CardHeader>
         <CardContent>
           {container ? (
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-sm">
-              <div>
-                <dt className="text-xs text-muted-foreground">Container No.</dt>
-                <dd className="font-mono font-medium">{container.containerNumber}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Size</dt>
-                <dd>{container.sizeType}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Seal No.</dt>
-                <dd className="font-mono">{container.sealNumber || '-'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Shipping Line</dt>
-                <dd>{container.shippingLine || '-'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Status</dt>
-                <dd><Badge variant="muted">{container.status}</Badge></dd>
-              </div>
-            </dl>
+            <div className="space-y-4">
+              <dl className="grid grid-cols-2 gap-4 sm:grid-cols-5 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">Container No.</dt>
+                  <dd className="font-mono font-medium">{container.containerNumber || <span className="text-muted-foreground font-normal">Open booking</span>}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Booking No.</dt>
+                  <dd className="font-mono">{container.bookingNumber || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Size</dt>
+                  <dd>{container.sizeType}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Seal No.</dt>
+                  <dd className="font-mono">{container.sealNumber || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Shipping Line</dt>
+                  <dd>{container.shippingLine || '-'}</dd>
+                </div>
+              </dl>
+              {!container.containerNumber && (
+                <div className="flex items-end gap-2 pt-2 border-t">
+                  <div className="space-y-1.5 flex-1 max-w-xs">
+                    <Label>Container number (assign once known)</Label>
+                    <Input value={lateContainerNumber} onChange={e => setLateContainerNumber(e.target.value.toUpperCase())} placeholder="MSCU4455663" />
+                  </div>
+                  <Button size="sm" onClick={fillLateContainerNumber} disabled={busy || !lateContainerNumber.trim()}>
+                    {busy ? 'Saving...' : 'Assign'}
+                  </Button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">No container attached to this trip yet.</p>
-              <div className="grid gap-3 sm:grid-cols-4">
+              <p className="text-sm text-muted-foreground">No container attached to this trip yet. Container number is optional — leave it blank to open the booking now and fill it in once the line assigns one.</p>
+              <div className="grid gap-3 sm:grid-cols-5">
                 <div className="space-y-1.5">
                   <Label>Container No.</Label>
-                  <Input value={newContainerNumber} onChange={e => setNewContainerNumber(e.target.value.toUpperCase())} placeholder="MSCU4455663" />
+                  <Input value={newContainerNumber} onChange={e => setNewContainerNumber(e.target.value.toUpperCase())} placeholder="Optional" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Size</Label>
@@ -669,6 +734,10 @@ function ContainerTab({ shipmentId, container, onAttached }: { shipmentId: strin
                   </Select>
                 </div>
                 <div className="space-y-1.5">
+                  <Label>Booking No.</Label>
+                  <Input value={newBookingNumber} onChange={e => setNewBookingNumber(e.target.value)} placeholder="BKG-2026-00142" />
+                </div>
+                <div className="space-y-1.5">
                   <Label>Seal No.</Label>
                   <Input value={newSealNumber} onChange={e => setNewSealNumber(e.target.value)} placeholder="ML-TH092144" />
                 </div>
@@ -677,7 +746,7 @@ function ContainerTab({ shipmentId, container, onAttached }: { shipmentId: strin
                   <Input value={newShippingLine} onChange={e => setNewShippingLine(e.target.value)} placeholder="Maersk" />
                 </div>
               </div>
-              <Button size="sm" onClick={attachContainer} disabled={busy || !newContainerNumber.trim()}>
+              <Button size="sm" onClick={attachContainer} disabled={busy}>
                 {busy ? 'Attaching...' : 'Attach Container'}
               </Button>
             </div>

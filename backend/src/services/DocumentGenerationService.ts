@@ -15,6 +15,7 @@ import { defaultCustomsTemplate } from './templates/customsTemplate.js';
 import { defaultRateConfirmationTemplate } from './templates/rateConfirmationTemplate.js';
 import { defaultInvoiceTemplate } from './templates/invoiceTemplate.js';
 import { defaultWithholdingCertificateTemplate } from './templates/withholdingCertificateTemplate.js';
+import { defaultJobSheetTemplate } from './templates/jobSheetTemplate.js';
 import { mapCustomsLineItem, totalDeclaredValueFor } from './customs/customsLineItemMapping.js';
 import { toBahtText } from './thaiTax/bahtText.js';
 
@@ -25,6 +26,7 @@ export interface IDocumentGenerationService {
   generateRateConfirmation(shipmentId: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateInvoicePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateWithholdingCertificatePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
+  generateJobSheetPdf(shipmentId: string, userId?: string): Promise<{ id: string; fileName: string }>;
 }
 
 function formatDate(d: Date | null | undefined): string {
@@ -493,6 +495,58 @@ export class DocumentGenerationService implements IDocumentGenerationService {
       fileSize: pdfBytes.length,
       fileContent: buffer,
       customerId: invoice.customerId,
+      generatedBy: userId,
+      metadata: data,
+    }, storageKey);
+
+    return { id: doc.id, fileName };
+  }
+
+  async generateJobSheetPdf(shipmentId: string, userId?: string) {
+    const shipment = await this.prisma.shipment.findUniqueOrThrow({
+      where: { id: shipmentId },
+      include: {
+        origin: true,
+        destination: true,
+        shippingContainer: true,
+        loads: { include: { vehicle: true, driver: true } },
+        driverAdvance: true,
+      },
+    });
+
+    const load = shipment.loads[0];
+    const branding = await this.loadBranding();
+
+    const data = {
+      branding,
+      reference: shipment.reference,
+      pickupDate: formatDate(shipment.pickupDate),
+      tractorPlate: load?.vehicle?.plate || '-',
+      trailerPlate: load?.trailerPlate || '-',
+      driverName: load?.driver?.name || '-',
+      driverPhone: load?.driver?.phone || '-',
+      bookingNumber: shipment.shippingContainer?.bookingNumber || '-',
+      containerNumber: shipment.shippingContainer?.containerNumber || '-',
+      containerSize: shipment.shippingContainer?.sizeType || '-',
+      sealNumber: shipment.shippingContainer?.sealNumber || '-',
+      originName: shipment.origin ? `${shipment.origin.name} (${shipment.origin.city})` : '-',
+      destinationName: shipment.destination ? `${shipment.destination.name} (${shipment.destination.city})` : '-',
+      advanceAmount: shipment.driverAdvance ? `฿${(shipment.driverAdvance.totalAdvanceCents / 100).toFixed(2)}` : '-',
+    };
+
+    const html = Handlebars.compile(defaultJobSheetTemplate)(data);
+    const pdfBytes = await this.htmlToPdf(html, `Job Sheet - ${shipment.reference}`);
+
+    const fileName = `Job-Sheet-${shipment.reference}.pdf`;
+    const buffer = Buffer.from(pdfBytes);
+    const storageKey = `files/${randomUUID()}`;
+
+    const doc = await this.storeDocument({
+      documentType: 'job_sheet',
+      fileName,
+      mimeType: 'application/pdf',
+      fileSize: pdfBytes.length,
+      fileContent: buffer,
       generatedBy: userId,
       metadata: data,
     }, storageKey);

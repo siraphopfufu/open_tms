@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleAlert,
+  Container,
   Info,
   Loader2,
   MapPin,
@@ -109,6 +110,15 @@ export default function VNextCreateShipment() {
   const [reference, setReference] = useState('');
   const [mode, setMode] = useState('');
   const [proNumber, setProNumber] = useState('');
+
+  // Drayage one-screen booking (customer flowchart Must Have #1/#2): container
+  // number is optional here — dispatch can open the job as soon as the size
+  // and booking number are known, and fill the container number in later
+  // once the shipping line assigns one (the shipment's Container tab).
+  const [containerSizeType, setContainerSizeType] = useState('');
+  const [bookingNumber, setBookingNumber] = useState('');
+  const [containerNumber, setContainerNumber] = useState('');
+  const [sealNumber, setSealNumber] = useState('');
 
   const [originLocation, setOriginLocation] = useState('');
   const [pickupDate, setPickupDate] = useState('');
@@ -584,6 +594,37 @@ export default function VNextCreateShipment() {
       const newId = json.data?.id ?? id;
       const ref = json.data?.reference || newId?.slice(0, 8);
 
+      // One-screen drayage booking: attach a container/booking placeholder in
+      // the same submit instead of sending dispatch to the shipment's
+      // Container tab afterward. Only on create — editing an existing
+      // shipment's container happens on its Container tab, which already
+      // knows about any container attached to it.
+      if (!isEdit && newId && containerSizeType) {
+        try {
+          const containerRes = await fetch(`${API_URL}/api/v1/shipping-containers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sizeType: containerSizeType,
+              bookingNumber: bookingNumber || undefined,
+              containerNumber: containerNumber || undefined,
+              sealNumber: sealNumber || undefined,
+            }),
+          });
+          const containerJson = await containerRes.json();
+          if (containerJson.error) throw new Error(containerJson.error);
+          const linkRes = await fetch(`${API_URL}/api/v1/shipments/${newId}/container`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shippingContainerId: containerJson.data.id }),
+          });
+          const linkJson = await linkRes.json();
+          if (linkJson.error) throw new Error(linkJson.error);
+        } catch (err: any) {
+          toast.error(`Shipment saved, but the container couldn't be attached: ${err.message}. Add it from the shipment's Container tab.`);
+        }
+      }
+
       if (notes.length > 0 && newId) {
         const results = await Promise.allSettled(notes.map(async n => {
           const noteRes = await fetch(`${API_URL}/api/v1/comments`, {
@@ -759,6 +800,60 @@ export default function VNextCreateShipment() {
                 Longer than {selectedCarrier.name}'s usual {selectedCarrier.proNumberMaxLength} characters — double-check it.
               </p>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Container className="h-4 w-4 text-primary" />
+            Container &amp; booking
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-4">
+          <div className="space-y-2">
+            <Label>Container size</Label>
+            <Select value={containerSizeType} onValueChange={setContainerSizeType}>
+              <SelectTrigger>
+                <SelectValue placeholder="Not a container job" />
+              </SelectTrigger>
+              <SelectContent>
+                {['20GP', '40GP', '40HC', '40RF'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Booking number</Label>
+            <Input
+              type="text"
+              placeholder="e.g. BKG-2026-00142"
+              value={bookingNumber}
+              onChange={e => setBookingNumber(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Container number</Label>
+            <Input
+              type="text"
+              placeholder="Leave blank if not yet known"
+              value={containerNumber}
+              onChange={e => setContainerNumber(e.target.value.toUpperCase())}
+            />
+            {containerSizeType && !containerNumber && (
+              <p className="text-xs text-muted-foreground">
+                Open booking — add the container number later, once the line assigns one.
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Seal number</Label>
+            <Input
+              type="text"
+              placeholder="Usually known at pickup"
+              value={sealNumber}
+              onChange={e => setSealNumber(e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>

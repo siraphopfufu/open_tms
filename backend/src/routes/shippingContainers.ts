@@ -72,10 +72,10 @@ export async function shippingContainerRoutes(server: FastifyInstance) {
     preHandler: requirePermission('shipments:write'),
     schema: {
       tags: ['Shipping Containers'],
-      description: 'Register an ISO 6346 shipping container. Validates the check digit server-side.',
+      description: 'Register a shipping container (or a booking placeholder before the container number is known). Validates the check digit server-side when a container number is given.',
       body: {
         type: 'object',
-        required: ['containerNumber', 'sizeType'],
+        required: ['sizeType'],
         properties: {
           containerNumber: { type: 'string' },
           sizeType: { type: 'string', enum: CONTAINER_SIZE_TYPES as unknown as string[] },
@@ -91,17 +91,21 @@ export async function shippingContainerRoutes(server: FastifyInstance) {
     const orgId = req.orgId!;
     const body = req.body as any;
 
-    const validation = validateContainerNumber(body.containerNumber);
-    if (!validation.valid) {
-      reply.code(400);
-      return { data: null, error: `Invalid container number: ${validation.reason}` };
+    let normalizedContainerNumber: string | null = null;
+    if (body.containerNumber) {
+      const validation = validateContainerNumber(body.containerNumber);
+      if (!validation.valid) {
+        reply.code(400);
+        return { data: null, error: `Invalid container number: ${validation.reason}` };
+      }
+      normalizedContainerNumber = validation.normalized!;
     }
 
     try {
       const created = await server.prisma.shippingContainer.create({
         data: {
           orgId,
-          containerNumber: validation.normalized!,
+          containerNumber: normalizedContainerNumber,
           sizeType: body.sizeType,
           sealNumber: body.sealNumber || null,
           status: body.status || 'empty',
@@ -115,7 +119,7 @@ export async function shippingContainerRoutes(server: FastifyInstance) {
     } catch (err: any) {
       if (err.code === 'P2002') {
         reply.code(409);
-        return { data: null, error: `Container ${validation.normalized} is already registered` };
+        return { data: null, error: `Container ${normalizedContainerNumber} is already registered` };
       }
       reply.code(400);
       return { data: null, error: err.message };
@@ -126,10 +130,12 @@ export async function shippingContainerRoutes(server: FastifyInstance) {
     preHandler: requirePermission('shipments:write'),
     schema: {
       tags: ['Shipping Containers'],
+      description: 'Update a container, including filling in the container number once the shipping line assigns one to an open booking',
       params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
       body: {
         type: 'object',
         properties: {
+          containerNumber: { type: 'string' },
           sealNumber: { type: 'string' },
           status: { type: 'string', enum: ['empty', 'laden', 'discharged'] },
           shippingLine: { type: 'string' },
@@ -148,9 +154,22 @@ export async function shippingContainerRoutes(server: FastifyInstance) {
         reply.code(404);
         return { data: null, error: 'Shipping container not found' };
       }
-      const updated = await server.prisma.shippingContainer.update({ where: { id }, data: body });
+      const data = { ...body };
+      if (typeof body.containerNumber === 'string') {
+        const validation = validateContainerNumber(body.containerNumber);
+        if (!validation.valid) {
+          reply.code(400);
+          return { data: null, error: `Invalid container number: ${validation.reason}` };
+        }
+        data.containerNumber = validation.normalized;
+      }
+      const updated = await server.prisma.shippingContainer.update({ where: { id }, data });
       return { data: updated, error: null };
     } catch (err: any) {
+      if (err.code === 'P2002') {
+        reply.code(409);
+        return { data: null, error: `Container ${body.containerNumber} is already registered` };
+      }
       reply.code(400);
       return { data: null, error: err.message };
     }

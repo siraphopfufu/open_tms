@@ -2729,7 +2729,10 @@ model ShippingContainer {
   orgId           String
   // ISO 6346: 4-letter owner+category code (3 letters + U/J/Z) + 6 digits + 1 check digit,
   // e.g. "MSKU9082341". Validated server-side — see services/shippingContainers/iso6346.ts.
-  containerNumber String   @unique
+  // Nullable: a job can be booked (size + booking number known) before the
+  // shipping line assigns a container, and dispatch fills it in once the
+  // driver picks it up at the depot (Must Have #2, "Open Booking").
+  containerNumber String?  @unique
   // 20GP, 40GP, 40HC, 40RF (reefer)
   sizeType        String
   sealNumber      String?

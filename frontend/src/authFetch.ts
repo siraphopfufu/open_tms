@@ -76,6 +76,16 @@ function isPortalRoute(url: string): boolean {
   );
 }
 
+function isTolerant401Route(url: string): boolean {
+  // MapProvider fetches this unconditionally on mount, on every page — including
+  // the customer/carrier portal login screens, which render before any main-TMS
+  // token exists. A 401 there just means "no org key configured for this
+  // visitor" (MapProvider already falls back to OSM tiles on any failure); it
+  // must never be treated as "the operator's session expired" and bounce an
+  // unauthenticated portal visitor to the internal /login screen.
+  return url.includes('/api/v1/maps/api-key');
+}
+
 function isAuthPublicRoute(url: string): boolean {
   // Login / forgot-password / theme / share links — no main TMS token needed.
   // Share routes carry their own viewer session token when they have one, and a 401 there
@@ -158,7 +168,7 @@ export function installAuthFetchInterceptor() {
     const res = await originalFetch(input, finalInit);
 
     // On 401 from main TMS routes, bounce to /login.
-    if (res.status === 401 && !isPortalRoute(url) && !isAuthPublicRoute(url)) {
+    if (res.status === 401 && !isPortalRoute(url) && !isAuthPublicRoute(url) && !isTolerant401Route(url)) {
       localStorage.removeItem(MAIN_TMS_TOKEN_KEY);
       localStorage.removeItem(MAIN_TMS_USER_KEY);
       redirectToLogin();

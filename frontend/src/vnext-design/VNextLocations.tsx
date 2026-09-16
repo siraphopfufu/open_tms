@@ -260,6 +260,7 @@ export default function VNextLocations() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All countries</SelectItem>
+              <SelectItem value="TH">Thailand</SelectItem>
               <SelectItem value="US">United States</SelectItem>
               <SelectItem value="CA">Canada</SelectItem>
               <SelectItem value="MX">Mexico</SelectItem>

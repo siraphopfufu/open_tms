@@ -18,6 +18,100 @@ import {
 export async function tripSettlementRoutes(server: FastifyInstance) {
   await registerOrgScope(server);
 
+  // ─── Daily Cash Desk ────────────────────────────────────────────────────────
+  // The morning-advance / evening-settlement cycle happens dozens of times a
+  // day across every dispatched trip. Opening each shipment's Trip Settlement
+  // tab one at a time doesn't match how the cash desk actually works — this
+  // aggregates every dispatched trip into one worklist so the desk can clear
+  // the day without hunting for shipments.
+
+  server.get('/api/v1/cash-desk/board', {
+    schema: { tags: ['Trip Settlement'], description: 'Dispatched trips grouped by driver-advance/settlement stage' },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const orgId = req.orgId!;
+    try {
+      // Active trips only: a completed shipment from months ago that never
+      // got an advance recorded is stale history, not something the desk
+      // needs to chase today.
+      const loads = await server.prisma.load.findMany({
+        where: {
+          driverId: { not: null },
+          shipment: { orgId, deletedAt: null, archived: false, status: { in: ['draft', 'ready', 'in_progress'] } },
+        },
+        select: {
+          shipmentId: true,
+          driver: { select: { id: true, name: true } },
+          vehicle: { select: { plate: true, standardKmPerLiter: true } },
+          shipment: {
+            select: {
+              id: true,
+              reference: true,
+              status: true,
+              pickupDate: true,
+              lane: { select: { distance: true } },
+              driverAdvance: true,
+              tripSettlement: true,
+            },
+          },
+        },
+        orderBy: { assignedAt: 'desc' },
+      });
+
+      const needsAdvance: any[] = [];
+      const awaitingSettlement: any[] = [];
+
+      for (const load of loads) {
+        const s = load.shipment;
+        const item = {
+          shipmentId: s.id,
+          reference: s.reference,
+          status: s.status,
+          pickupDate: s.pickupDate,
+          driverName: load.driver?.name ?? null,
+          tractorPlate: load.vehicle?.plate ?? null,
+          laneDistanceKm: s.lane?.distance ?? null,
+          vehicleKmPerLiter: load.vehicle?.standardKmPerLiter ?? null,
+          totalAdvanceCents: s.driverAdvance?.totalAdvanceCents ?? null,
+          advanceStatus: s.driverAdvance?.status ?? null,
+          netSettlementCents: s.tripSettlement?.netSettlementCents ?? null,
+          isOverBenchmark: s.tripSettlement?.isOverBenchmark ?? null,
+        };
+
+        if (!s.driverAdvance) {
+          needsAdvance.push(item);
+        } else if (!s.tripSettlement || s.tripSettlement.status !== 'settled') {
+          awaitingSettlement.push(item);
+        }
+      }
+
+      // Settlement history is queried independently of shipment status — a
+      // trip settled last week is still worth showing even after the
+      // shipment itself moves to "complete".
+      const settledRows = await server.prisma.tripSettlement.findMany({
+        where: { orgId, status: 'settled' },
+        include: { driver: { select: { name: true } }, shipment: { select: { reference: true } } },
+        orderBy: { settledAt: 'desc' },
+        take: 30,
+      });
+      const settled = settledRows.map(r => ({
+        shipmentId: r.shipmentId,
+        reference: r.shipment.reference,
+        driverName: r.driver?.name ?? null,
+        netSettlementCents: r.netSettlementCents,
+        isOverBenchmark: r.isOverBenchmark,
+        settledAt: r.settledAt,
+      }));
+
+      return {
+        data: { needsAdvance, awaitingSettlement, settled },
+        error: null,
+      };
+    } catch (err: any) {
+      reply.code(500);
+      return { data: null, error: err.message };
+    }
+  });
+
   // ─── Driver Advance ─────────────────────────────────────────────────────────
 
   server.get('/api/v1/shipments/:id/driver-advance', {
