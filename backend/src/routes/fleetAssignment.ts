@@ -109,6 +109,9 @@ export async function fleetAssignmentRoutes(server: FastifyInstance) {
           plate: { type: 'string' },
           type: { type: 'string' },
           standardKmPerLiter: { type: 'number', minimum: 0.1 },
+          taxExpiryDate: { type: 'string' },
+          insuranceExpiryDate: { type: 'string' },
+          inspectionExpiryDate: { type: 'string' },
         },
       },
     },
@@ -129,6 +132,9 @@ export async function fleetAssignmentRoutes(server: FastifyInstance) {
           plate: body.plate,
           type: body.type || 'tractor',
           standardKmPerLiter: body.standardKmPerLiter ?? null,
+          taxExpiryDate: body.taxExpiryDate ? new Date(body.taxExpiryDate) : null,
+          insuranceExpiryDate: body.insuranceExpiryDate ? new Date(body.insuranceExpiryDate) : null,
+          inspectionExpiryDate: body.inspectionExpiryDate ? new Date(body.inspectionExpiryDate) : null,
         },
       });
       reply.code(201);

@@ -16,6 +16,7 @@ import { defaultRateConfirmationTemplate } from './templates/rateConfirmationTem
 import { defaultInvoiceTemplate } from './templates/invoiceTemplate.js';
 import { defaultWithholdingCertificateTemplate } from './templates/withholdingCertificateTemplate.js';
 import { defaultJobSheetTemplate } from './templates/jobSheetTemplate.js';
+import { defaultReceiptTemplate } from './templates/receiptTemplate.js';
 import { mapCustomsLineItem, totalDeclaredValueFor } from './customs/customsLineItemMapping.js';
 import { toBahtText } from './thaiTax/bahtText.js';
 
@@ -27,6 +28,7 @@ export interface IDocumentGenerationService {
   generateInvoicePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateWithholdingCertificatePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateJobSheetPdf(shipmentId: string, userId?: string): Promise<{ id: string; fileName: string }>;
+  generateReceiptPdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
 }
 
 function formatDate(d: Date | null | undefined): string {
@@ -547,6 +549,50 @@ export class DocumentGenerationService implements IDocumentGenerationService {
       mimeType: 'application/pdf',
       fileSize: pdfBytes.length,
       fileContent: buffer,
+      generatedBy: userId,
+      metadata: data,
+    }, storageKey);
+
+    return { id: doc.id, fileName };
+  }
+
+  async generateReceiptPdf(invoiceId: string, userId?: string) {
+    const invoice = await this.prisma.invoice.findUniqueOrThrow({
+      where: { id: invoiceId },
+      include: { receipt: true, customer: true },
+    });
+    const receipt = invoice.receipt;
+    if (!receipt) throw new Error('No receipt has been issued for this invoice yet');
+
+    const branding = await this.loadBranding();
+    const org = await this.prisma.organization.findFirst({ select: { name: true } });
+    const isThb = receipt.currency === 'THB';
+
+    const data = {
+      branding,
+      receiptNumber: receipt.receiptNumber,
+      issueDate: formatDate(receipt.issueDate),
+      invoiceNumber: invoice.invoiceNumber,
+      payeeName: org?.name ?? 'Ather TMS',
+      customerName: invoice.customer.name,
+      amount: `${isThb ? '฿' : '$'}${(receipt.amountCents / 100).toFixed(2)}`,
+      amountBahtText: isThb ? toBahtText(receipt.amountCents / 100) : null,
+    };
+
+    const html = Handlebars.compile(defaultReceiptTemplate)(data);
+    const pdfBytes = await this.htmlToPdf(html, `Receipt - ${receipt.receiptNumber}`);
+
+    const fileName = `Receipt-${receipt.receiptNumber}.pdf`;
+    const buffer = Buffer.from(pdfBytes);
+    const storageKey = `files/${randomUUID()}`;
+
+    const doc = await this.storeDocument({
+      documentType: 'receipt',
+      fileName,
+      mimeType: 'application/pdf',
+      fileSize: pdfBytes.length,
+      fileContent: buffer,
+      customerId: invoice.customerId,
       generatedBy: userId,
       metadata: data,
     }, storageKey);

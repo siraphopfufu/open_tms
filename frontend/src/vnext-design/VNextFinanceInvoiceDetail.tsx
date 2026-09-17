@@ -63,6 +63,13 @@ interface WithholdingCertificate {
   issueDate: string;
 }
 
+interface ReceiptData {
+  id: string;
+  receiptNumber: string;
+  amountCents: number;
+  issueDate: string;
+}
+
 interface InvoiceData {
   id: string;
   invoiceNumber: string;
@@ -87,6 +94,7 @@ interface InvoiceData {
   lineItems: InvoiceLineItem[];
   payments: Payment[];
   withholdingCertificate?: WithholdingCertificate | null;
+  receipt?: ReceiptData | null;
 }
 
 function formatMoney(cents: number, currency = 'USD'): string {
@@ -187,6 +195,17 @@ export default function VNextFinanceInvoiceDetail() {
     setActionLoading('certificate');
     try {
       const res = await fetch(`${API_URL}/api/v1/invoices/${id}/withholding-certificate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      await load();
+    } catch (e: any) { alert(e.message); }
+    finally { setActionLoading(''); }
+  };
+
+  const issueReceipt = async () => {
+    setActionLoading('receipt');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/invoices/${id}/receipt`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       await load();
@@ -445,6 +464,49 @@ export default function VNextFinanceInvoiceDetail() {
               </div>
             </Card>
           )}
+
+          <Card>
+            <div className="flex items-center justify-between p-5">
+              <h2 className="text-lg font-semibold">Official Receipt</h2>
+              {!i.receipt && i.paidCents > 0 && (
+                <Button size="sm" onClick={issueReceipt} disabled={!!actionLoading}>
+                  <FileText className="h-4 w-4" />
+                  {actionLoading === 'receipt' ? 'Issuing...' : 'Issue Receipt'}
+                </Button>
+              )}
+            </div>
+            <Separator />
+            <div className="p-5">
+              {i.receipt ? (
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <dl className="grid grid-cols-3 gap-6 text-sm">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Receipt #</dt>
+                      <dd className="font-mono">{i.receipt.receiptNumber}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Issued</dt>
+                      <dd>{formatDate(i.receipt.issueDate)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Amount</dt>
+                      <dd className="font-mono tabular-nums">{formatMoney(i.receipt.amountCents, i.currency)}</dd>
+                    </div>
+                  </dl>
+                  <Button size="sm" variant="outline" onClick={() => downloadDocument('receipt-pdf', 'receipt-pdf')} disabled={!!actionLoading}>
+                    <Download className="h-4 w-4" />
+                    {actionLoading === 'receipt-pdf' ? 'Preparing...' : 'Download PDF'}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {i.paidCents > 0
+                    ? 'No receipt issued yet — issue one once payment has cleared.'
+                    : 'Record a payment before issuing a receipt.'}
+                </p>
+              )}
+            </div>
+          </Card>
 
           {i.payments.length > 0 && (
             <Card>

@@ -127,6 +127,8 @@ import VNextFinanceQuotes from './vnext-design/VNextFinanceQuotes';
 import VNextFinanceQueries from './vnext-design/VNextFinanceQueries';
 import VNextFinanceCreditNotes from './vnext-design/VNextFinanceCreditNotes';
 import VNextFinanceInvoiceDetail from './vnext-design/VNextFinanceInvoiceDetail';
+import VNextUnbilledLedger from './vnext-design/VNextUnbilledLedger';
+import VNextFleetCompliance from './vnext-design/VNextFleetCompliance';
 import VNextFinanceCarrierInvoiceDetail from './vnext-design/VNextFinanceCarrierInvoiceDetail';
 import VNextFinanceQuoteDetail from './vnext-design/VNextFinanceQuoteDetail';
 import VNextFinanceQueryDetail from './vnext-design/VNextFinanceQueryDetail';
@@ -366,6 +368,7 @@ root.render(
 
           {/* Carriers */}
           <Route path="carriers" element={<VNextCarriers />} />
+          <Route path="fleet-compliance" element={<VNextFleetCompliance />} />
           <Route path="carriers/create" element={<VNextCreateCarrier />} />
           <Route path="carriers/:id/edit" element={<VNextCreateCarrier />} />
 
@@ -431,6 +434,7 @@ root.render(
           <Route path="finance/invoices" element={<VNextFinanceInvoices />} />
           <Route path="finance/invoices/create" element={<VNextFinanceCreateInvoice />} />
           <Route path="finance/invoices/:id" element={<VNextFinanceInvoiceDetail />} />
+          <Route path="finance/unbilled" element={<VNextUnbilledLedger />} />
           <Route path="finance/carrier-invoices" element={<VNextFinanceCarrierInvoices />} />
           <Route path="finance/carrier-invoices/:id" element={<VNextFinanceCarrierInvoiceDetail />} />
           <Route path="finance/quotes" element={<VNextFinanceQuotes />} />

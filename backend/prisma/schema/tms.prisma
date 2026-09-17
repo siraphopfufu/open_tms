@@ -417,6 +417,13 @@ model Vehicle {
   // efficiency for this tractor, used to compute expected fuel cost against
   // actual receipts. Falls back to a company-wide default when unset.
   standardKmPerLiter Float?
+  // Fleet compliance (Must Have #20): annual tax disc, insurance, and the
+  // 6-monthly ตรอ (vehicle inspection) renewal. Tracked per Vehicle row, so
+  // registering a trailer as its own Vehicle (type: "trailer") gives it the
+  // same expiry tracking as a tractor.
+  taxExpiryDate        DateTime?
+  insuranceExpiryDate  DateTime?
+  inspectionExpiryDate DateTime?
   loads      Load[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

@@ -146,6 +146,7 @@ model Invoice {
   payments              Payment[]
   creditNotes           CreditNote[]                @relation("InvoiceCreditNotes")
   withholdingCertificate WithholdingTaxCertificate?
+  receipt               Receipt?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -472,6 +473,27 @@ model WithholdingTaxCertificate {
 
   issueDate DateTime @default(now())
   createdAt DateTime @default(now())
+
+  @@index([orgId])
+}
+
+// Official receipt (ใบเสร็จรับเงิน): issued once a customer's payment against
+// an invoice clears, with its own sequence distinct from the invoice number
+// (Must Have #17). One per invoice — a partially-paid invoice can still get
+// a receipt for the amount received so far; the accountant re-issues if the
+// balance is later paid in full is out of scope for this model (single
+// receipt per invoice, matching how the source requirement described it).
+model Receipt {
+  id            String   @id @default(uuid())
+  orgId         String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId     String   @unique
+  receiptNumber String   @unique // RC-YYYYMM-0001
+  amountCents   Int // amount received at time of issue (invoice.paidCents)
+  currency      String   @default("USD")
+  issueDate     DateTime @default(now())
+  issuedBy      String?
+  createdAt     DateTime @default(now())
 
   @@index([orgId])
 }

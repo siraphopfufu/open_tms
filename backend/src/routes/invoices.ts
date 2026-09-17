@@ -11,8 +11,19 @@ import { RECORD_PAYMENT, RecordPaymentPayload } from '../commands/invoices/Recor
 import { VOID_INVOICE, VoidInvoicePayload } from '../commands/invoices/VoidInvoiceCommand.js';
 import { guardWrites } from '../auth/guardWrites.js';
 import { toBahtText } from '../services/thaiTax/bahtText.js';
+import { registerOrgScope } from '../auth/orgScopeMiddleware.js';
 
 export async function invoiceRoutes(server: FastifyInstance) {
+  // Pre-existing gap: this file reads every write's org from
+  // `(req as any).orgId`, but nothing in it ever populated that field —
+  // every invoice, payment, WHT certificate, and (new) receipt created
+  // through these routes was silently stamped with orgId "". A single-org
+  // deployment never surfaces it (there's nothing to leak across), but it's
+  // real multi-tenancy breakage. Registering the same hook every other
+  // authenticated route module uses fixes every call site in this file at
+  // once, since they already read `req.orgId`.
+  await registerOrgScope(server);
+
   const invoiceRepo = container.resolve<IInvoiceRepository>(TOKENS.IInvoiceRepository);
   const invoicingService = container.resolve<IInvoicingService>(TOKENS.IInvoicingService);
   const commandBus = container.resolve<ICommandBus>(TOKENS.ICommandBus);
@@ -329,6 +340,60 @@ export async function invoiceRoutes(server: FastifyInstance) {
         data: { ...certificate, witheldAmountBahtText: toBahtText(certificate.witheldAmountCents / 100) },
         error: null,
       };
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
+  // Issue an official receipt (ใบเสร็จรับเงิน) once a payment has been recorded
+  server.post('/api/v1/invoices/:id/receipt', {
+    schema: {
+      tags: ['Financial - Invoices'],
+      summary: 'Issue an official receipt for an invoice with at least one payment recorded, numbered separately from the invoice sequence',
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const invoice = await invoiceRepo.findById(id);
+      if (!invoice) {
+        reply.code(404);
+        return { data: null, error: 'Invoice not found' };
+      }
+      if (invoice.paidCents <= 0) {
+        reply.code(400);
+        return { data: null, error: 'No payment has been recorded against this invoice yet' };
+      }
+      if (invoice.receipt) {
+        reply.code(409);
+        return { data: null, error: 'A receipt already exists for this invoice', receiptId: invoice.receipt.id } as any;
+      }
+
+      const prisma = container.resolve<any>(TOKENS.PrismaClient);
+      const today = new Date();
+      const monthStr = today.toISOString().slice(0, 7).replace('-', '');
+      const prefix = `RC-${monthStr}-`;
+      const latest = await prisma.receipt.findFirst({
+        where: { orgId: (req as any).orgId ?? '', receiptNumber: { startsWith: prefix } },
+        orderBy: { receiptNumber: 'desc' },
+        select: { receiptNumber: true },
+      });
+      const seq = latest ? parseInt(latest.receiptNumber.slice(prefix.length), 10) + 1 : 1;
+      const receiptNumber = `${prefix}${String(seq).padStart(4, '0')}`;
+
+      const receipt = await prisma.receipt.create({
+        data: {
+          orgId: (req as any).orgId ?? '',
+          invoiceId: invoice.id,
+          receiptNumber,
+          amountCents: invoice.paidCents,
+          currency: invoice.currency,
+          issuedBy: (req as any).user?.sub ?? null,
+        },
+      });
+
+      reply.code(201);
+      return { data: receipt, error: null };
     } catch (err: any) {
       reply.code(400);
       return { data: null, error: err.message };

@@ -537,6 +537,29 @@ export async function documentRoutes(server: FastifyInstance) {
     }
   });
 
+  server.post('/api/v1/documents/receipt-pdf', {
+    preHandler: requirePermission('documents:generate'),
+    schema: {
+      description: 'Generate the PDF for an invoice\'s official receipt — the receipt must already be issued',
+      tags: ['Documents'],
+      body: {
+        type: 'object',
+        required: ['invoiceId'],
+        properties: { invoiceId: { type: 'string' } },
+      },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { invoiceId } = (req as any).body;
+    try {
+      const result = await docService.generateReceiptPdf(invoiceId, (req as any).user?.sub);
+      reply.code(201);
+      return { data: result, error: null };
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
   server.post('/api/v1/documents/job-sheet-pdf', {
     preHandler: requirePermission('documents:generate'),
     schema: {

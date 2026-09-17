@@ -165,6 +165,7 @@ const APPS: AppDef[] = [
       ]},
       { title: 'Network', items: [
         { to: '/carriers', icon: Truck, label: 'Carriers' },
+        { to: '/fleet-compliance', icon: Shield, label: 'Fleet Compliance' },
         { to: '/carrier-bidding', icon: Handshake, label: 'Carrier Bidding' },
         { to: '/customers', icon: Users, label: 'Customers' },
         { to: '/locations', icon: MapPin, label: 'Locations' },
@@ -212,6 +213,7 @@ const APPS: AppDef[] = [
         { to: '/finance', icon: LayoutDashboard, label: 'Dashboard', end: true },
         { to: '/finance/quotes', icon: FileSpreadsheet, label: 'Quotes' },
         { to: '/finance/invoices', icon: Receipt, label: 'Invoices' },
+        { to: '/finance/unbilled', icon: ClipboardList, label: 'Unbilled Ledger' },
         { to: '/finance/carrier-invoices', icon: Truck, label: 'Carrier Invoices' },
         { to: '/finance/payments', icon: CreditCard, label: 'Record Payments' },
       ]},
