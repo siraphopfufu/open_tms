@@ -25,6 +25,21 @@ Parameters:
     AllowedPattern: "[a-z0-9-]+"
     Description: Name prefix for all resources (lowercase, hyphens only)
 
+  DomainName:
+    Type: String
+    Default: tms.ather-ai.com
+    Description: Public hostname for the app. Gets an HTTPS listener + Route53 alias record.
+
+  HostedZoneId:
+    Type: String
+    Default: Z0004493WMT8OCYR4374
+    Description: Route53 hosted zone ID for the DomainName's parent zone (ather-ai.com)
+
+  CertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-1:283972468366:certificate/990e2dd9-d07c-4e4c-8e79-8be6355ef5e9
+    Description: ACM certificate ARN (us-east-1, DNS-validated) covering DomainName
+
 # ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
@@ -431,6 +446,48 @@ Resources:
       Actions:
         - Type: forward
           TargetGroupArn: !Ref BackendTargetGroup
+
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref FrontendTargetGroup
+
+  # Mirrors BackendAPIRule above, for the HTTPS listener
+  HTTPSBackendAPIRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HTTPSListener
+      Priority: 10
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - "/api/*"
+              - "/docs"
+              - "/docs/*"
+              - "/health"
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendTargetGroup
+
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ALB.DNSName
+        HostedZoneId: !GetAtt ALB.CanonicalHostedZoneID
+        EvaluateTargetHealth: true
 
   # ---- ECS Services ------------------------------------------------------
   BackendService:
