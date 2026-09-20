@@ -27,6 +27,12 @@ model Shipment {
   // Distinct from shipmentType, which drives physical restrictions (temp,
   // hazmat, humidity, equipment), not mode/service level.
   serviceLevel        String?
+  // Thai drayage job type (PoC demo, Should Have #3 from the QA report):
+  // "import" (pick up laden at the port, deliver to factory, return empty to
+  // depot), "export" (pick up empty at depot, load at factory, deliver laden
+  // to port), or "reposition" (move an empty container between yards/ports
+  // with no cargo). Purely descriptive — doesn't drive any workflow logic.
+  direction           String?
   items               Json?
   archived            Boolean       @default(false)
   archivedAt          DateTime?

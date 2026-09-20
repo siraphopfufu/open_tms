@@ -103,7 +103,8 @@ function formatMoney(cents: number, currency = 'USD'): string {
 }
 function formatDate(d?: string): string {
   if (!d) return '-';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const date = new Date(d);
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info' | 'muted';
@@ -217,7 +218,7 @@ export default function VNextFinanceInvoiceDetail() {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-muted-foreground">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <h3 className="text-lg font-medium">Loading...</h3>
+        <h3 className="text-lg font-medium">กำลังโหลด...</h3>
       </div>
     );
   }
@@ -225,7 +226,7 @@ export default function VNextFinanceInvoiceDetail() {
     return (
       <div className="flex items-center gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         <CircleAlert className="h-5 w-5" />
-        {error || 'Invoice not found'}
+        {error || 'ไม่พบใบแจ้งหนี้'}
       </div>
     );
   }
@@ -238,7 +239,7 @@ export default function VNextFinanceInvoiceDetail() {
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm">
         <Button variant="ghost" size="sm" onClick={() => navigate('/finance/invoices')}>
-          <ArrowLeft className="h-4 w-4" /> Invoices
+          <ArrowLeft className="h-4 w-4" /> ใบแจ้งหนี้
         </Button>
         <span className="text-muted-foreground">/ {i.invoiceNumber}</span>
       </div>
@@ -248,38 +249,38 @@ export default function VNextFinanceInvoiceDetail() {
           <h1 className="text-3xl font-bold tracking-tight">{i.invoiceNumber}</h1>
           <div className="mt-2 flex items-center gap-2">
             <Badge variant={statusVariant(i.status)}>{i.status.replace(/_/g, ' ')}</Badge>
-            {isPastDue && <Badge variant="destructive">OVERDUE</Badge>}
+            {isPastDue && <Badge variant="destructive">เกินกำหนด</Badge>}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => downloadDocument('invoice-pdf', 'invoice-pdf')} disabled={!!actionLoading}>
             <Download className="h-4 w-4" />
-            {actionLoading === 'invoice-pdf' ? 'Preparing...' : 'Download PDF'}
+            {actionLoading === 'invoice-pdf' ? 'กำลังเตรียม...' : 'ดาวน์โหลด PDF'}
           </Button>
           {i.status === 'draft' && (
             <Button size="sm" onClick={() => doAction('approve')} disabled={!!actionLoading}>
-              {actionLoading === 'approve' ? 'Approving...' : 'Approve'}
+              {actionLoading === 'approve' ? 'กำลังอนุมัติ...' : 'อนุมัติ'}
             </Button>
           )}
           {['draft', 'approved'].includes(i.status) && (
             <Button size="sm" onClick={() => doAction('send')} disabled={!!actionLoading}>
               <Send className="h-4 w-4" />
-              {actionLoading === 'send' ? 'Sending...' : 'Send'}
+              {actionLoading === 'send' ? 'กำลังส่ง...' : 'ส่งบิล'}
             </Button>
           )}
           {['sent', 'partial_paid', 'overdue'].includes(i.status) && (
             <Button size="sm" variant="default" onClick={() => setShowPayment(!showPayment)}>
-              <CreditCard className="h-4 w-4" /> Record Payment
+              <CreditCard className="h-4 w-4" /> บันทึกการรับเงิน
             </Button>
           )}
           {i.paidCents === 0 && !['void', 'paid'].includes(i.status) && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() => { if (confirm('Void this invoice?')) doAction('void', { reason: 'Voided by user' }); }}
+              onClick={() => { if (confirm('ยกเลิกใบแจ้งหนี้นี้?')) doAction('void', { reason: 'Voided by user' }); }}
               disabled={!!actionLoading}
             >
-              Void
+              ยกเลิก
             </Button>
           )}
         </div>
@@ -288,10 +289,10 @@ export default function VNextFinanceInvoiceDetail() {
       {showPayment && (
         <Card>
           <CardContent className="p-5">
-            <h3 className="mb-4 text-base font-semibold">Record Payment</h3>
+            <h3 className="mb-4 text-base font-semibold">บันทึกการรับเงิน</h3>
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="payment-amount">Amount ({isThai ? '฿' : '$'})</Label>
+                <Label htmlFor="payment-amount">จำนวนเงิน ({isThai ? '฿' : '$'})</Label>
                 <Input
                   id="payment-amount"
                   type="number"
@@ -300,36 +301,36 @@ export default function VNextFinanceInvoiceDetail() {
                   max={i.balanceCents / 100}
                   value={paymentAmount}
                   onChange={e => setPaymentAmount(e.target.value)}
-                  placeholder={`Max ${(i.balanceCents / 100).toFixed(2)}`}
+                  placeholder={`สูงสุด ${(i.balanceCents / 100).toFixed(2)}`}
                   className="w-[180px]"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Method</Label>
+                <Label>วิธีการรับเงิน</Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ach">ACH</SelectItem>
-                    <SelectItem value="wire">Wire</SelectItem>
-                    <SelectItem value="check">Check</SelectItem>
-                    <SelectItem value="credit_card">Credit Card</SelectItem>
+                    <SelectItem value="ach">โอนผ่านธนาคาร</SelectItem>
+                    <SelectItem value="wire">เงินโอน</SelectItem>
+                    <SelectItem value="check">เช็ค</SelectItem>
+                    <SelectItem value="credit_card">บัตรเครดิต</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="payment-ref">Reference #</Label>
+                <Label htmlFor="payment-ref">เลขที่อ้างอิง</Label>
                 <Input
                   id="payment-ref"
                   value={paymentRef}
                   onChange={e => setPaymentRef(e.target.value)}
-                  placeholder="Check #, ACH ref..."
+                  placeholder="เลขที่เช็ค, เลขอ้างอิงโอน..."
                   className="w-[200px]"
                 />
               </div>
               <Button onClick={recordPayment} disabled={!!actionLoading}>
-                {actionLoading === 'payments' ? 'Recording...' : 'Record'}
+                {actionLoading === 'payments' ? 'กำลังบันทึก...' : 'บันทึก'}
               </Button>
-              <Button variant="ghost" onClick={() => setShowPayment(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setShowPayment(false)}>ยกเลิก</Button>
             </div>
           </CardContent>
         </Card>
@@ -339,18 +340,18 @@ export default function VNextFinanceInvoiceDetail() {
         <div className="space-y-6">
           <Card>
             <div className="flex items-center justify-between p-5">
-              <h2 className="text-lg font-semibold">Line Items</h2>
+              <h2 className="text-lg font-semibold">รายการ</h2>
             </div>
             <Separator />
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Type</TableHead>
-                  {isThai && <TableHead>Container</TableHead>}
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>รายละเอียด</TableHead>
+                  <TableHead>ประเภท</TableHead>
+                  {isThai && <TableHead>ตู้</TableHead>}
+                  <TableHead className="text-right">จำนวน</TableHead>
+                  <TableHead className="text-right">ราคาต่อหน่วย</TableHead>
+                  <TableHead className="text-right">รวม</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -374,21 +375,21 @@ export default function VNextFinanceInvoiceDetail() {
             <div className="border-t p-5">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="font-semibold">Subtotal</span>
+                  <span className="font-semibold">ยอดรวม</span>
                   <span className="font-mono tabular-nums font-semibold">{formatMoney(i.subtotalCents, i.currency)}</span>
                 </div>
                 {isThai ? (
                   <>
                     <div className="flex justify-between">
-                      <span>VAT (7%)</span>
+                      <span>ภาษีมูลค่าเพิ่ม (7%)</span>
                       <span className="font-mono tabular-nums">{formatMoney(i.vatCents, i.currency)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Withholding Tax (1%, deducted by payer)</span>
+                      <span>ภาษีหัก ณ ที่จ่าย (1%)</span>
                       <span className="font-mono tabular-nums">-{formatMoney(i.whtCents, i.currency)}</span>
                     </div>
                     <div className="flex justify-between text-base">
-                      <span className="font-bold">Net Payable</span>
+                      <span className="font-bold">ยอดสุทธิ</span>
                       <span className="font-mono tabular-nums font-bold">{formatMoney(i.netPayableCents, i.currency)}</span>
                     </div>
                   </>
@@ -408,12 +409,12 @@ export default function VNextFinanceInvoiceDetail() {
                 )}
                 {i.paidCents > 0 && (
                   <div className="flex justify-between text-success">
-                    <span>Paid</span>
+                    <span>ชำระแล้ว</span>
                     <span className="font-mono tabular-nums">-{formatMoney(i.paidCents, i.currency)}</span>
                   </div>
                 )}
                 <div className={cn('flex justify-between font-bold', i.balanceCents > 0 ? 'text-destructive' : 'text-success')}>
-                  <span>Balance Due</span>
+                  <span>ยอดค้างชำระ</span>
                   <span className="font-mono tabular-nums">{formatMoney(i.balanceCents, i.currency)}</span>
                 </div>
               </div>
@@ -423,11 +424,11 @@ export default function VNextFinanceInvoiceDetail() {
           {isThai && (
             <Card>
               <div className="flex items-center justify-between p-5">
-                <h2 className="text-lg font-semibold">Withholding Tax Certificate (50 ทวิ)</h2>
+                <h2 className="text-lg font-semibold">หนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ)</h2>
                 {!i.withholdingCertificate && i.whtCents > 0 && (
                   <Button size="sm" onClick={issueCertificate} disabled={!!actionLoading}>
                     <FileText className="h-4 w-4" />
-                    {actionLoading === 'certificate' ? 'Issuing...' : 'Issue Certificate'}
+                    {actionLoading === 'certificate' ? 'กำลังออก...' : 'ออกหนังสือรับรอง'}
                   </Button>
                 )}
               </div>
@@ -437,28 +438,28 @@ export default function VNextFinanceInvoiceDetail() {
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <dl className="grid grid-cols-3 gap-6 text-sm">
                       <div>
-                        <dt className="text-xs text-muted-foreground">Certificate #</dt>
+                        <dt className="text-xs text-muted-foreground">เลขที่หนังสือรับรอง</dt>
                         <dd className="font-mono">{i.withholdingCertificate.certificateNumber}</dd>
                       </div>
                       <div>
-                        <dt className="text-xs text-muted-foreground">Form</dt>
+                        <dt className="text-xs text-muted-foreground">แบบฟอร์ม</dt>
                         <dd>{i.withholdingCertificate.withholdingType === 'pnd3' ? 'ภ.ง.ด. 3' : 'ภ.ง.ด. 53'}</dd>
                       </div>
                       <div>
-                        <dt className="text-xs text-muted-foreground">Withheld Amount</dt>
+                        <dt className="text-xs text-muted-foreground">จำนวนเงินที่หัก</dt>
                         <dd className="font-mono tabular-nums">{formatMoney(i.withholdingCertificate.witheldAmountCents, i.currency)}</dd>
                       </div>
                     </dl>
                     <Button size="sm" variant="outline" onClick={() => downloadDocument('withholding-certificate-pdf', 'wht-pdf')} disabled={!!actionLoading}>
                       <Download className="h-4 w-4" />
-                      {actionLoading === 'wht-pdf' ? 'Preparing...' : 'Download PDF'}
+                      {actionLoading === 'wht-pdf' ? 'กำลังเตรียม...' : 'ดาวน์โหลด PDF'}
                     </Button>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     {i.whtCents > 0
-                      ? 'No certificate issued yet — issue one once the customer confirms the withheld amount.'
-                      : 'This invoice has no withholding tax to certify.'}
+                      ? 'ยังไม่ได้ออกหนังสือรับรอง — ออกเมื่อลูกค้ายืนยันยอดหักภาษีแล้ว'
+                      : 'ใบแจ้งหนี้นี้ไม่มีภาษีหัก ณ ที่จ่าย'}
                   </p>
                 )}
               </div>
@@ -467,11 +468,11 @@ export default function VNextFinanceInvoiceDetail() {
 
           <Card>
             <div className="flex items-center justify-between p-5">
-              <h2 className="text-lg font-semibold">Official Receipt</h2>
+              <h2 className="text-lg font-semibold">ใบเสร็จรับเงิน</h2>
               {!i.receipt && i.paidCents > 0 && (
                 <Button size="sm" onClick={issueReceipt} disabled={!!actionLoading}>
                   <FileText className="h-4 w-4" />
-                  {actionLoading === 'receipt' ? 'Issuing...' : 'Issue Receipt'}
+                  {actionLoading === 'receipt' ? 'กำลังออก...' : 'ออกใบเสร็จ'}
                 </Button>
               )}
             </div>
@@ -481,28 +482,28 @@ export default function VNextFinanceInvoiceDetail() {
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <dl className="grid grid-cols-3 gap-6 text-sm">
                     <div>
-                      <dt className="text-xs text-muted-foreground">Receipt #</dt>
+                      <dt className="text-xs text-muted-foreground">เลขที่ใบเสร็จ</dt>
                       <dd className="font-mono">{i.receipt.receiptNumber}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-muted-foreground">Issued</dt>
+                      <dt className="text-xs text-muted-foreground">วันที่ออก</dt>
                       <dd>{formatDate(i.receipt.issueDate)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-muted-foreground">Amount</dt>
+                      <dt className="text-xs text-muted-foreground">จำนวนเงิน</dt>
                       <dd className="font-mono tabular-nums">{formatMoney(i.receipt.amountCents, i.currency)}</dd>
                     </div>
                   </dl>
                   <Button size="sm" variant="outline" onClick={() => downloadDocument('receipt-pdf', 'receipt-pdf')} disabled={!!actionLoading}>
                     <Download className="h-4 w-4" />
-                    {actionLoading === 'receipt-pdf' ? 'Preparing...' : 'Download PDF'}
+                    {actionLoading === 'receipt-pdf' ? 'กำลังเตรียม...' : 'ดาวน์โหลด PDF'}
                   </Button>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   {i.paidCents > 0
-                    ? 'No receipt issued yet — issue one once payment has cleared.'
-                    : 'Record a payment before issuing a receipt.'}
+                    ? 'ยังไม่ได้ออกใบเสร็จ — ออกเมื่อรับชำระเงินแล้ว'
+                    : 'บันทึกการรับเงินก่อนจึงจะออกใบเสร็จได้'}
                 </p>
               )}
             </div>
@@ -511,17 +512,17 @@ export default function VNextFinanceInvoiceDetail() {
           {i.payments.length > 0 && (
             <Card>
               <div className="p-5">
-                <h2 className="text-lg font-semibold">Payment History</h2>
+                <h2 className="text-lg font-semibold">ประวัติการรับเงิน</h2>
               </div>
               <Separator />
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Notes</TableHead>
+                    <TableHead>วันที่</TableHead>
+                    <TableHead>วิธีการ</TableHead>
+                    <TableHead>เลขที่อ้างอิง</TableHead>
+                    <TableHead className="text-right">จำนวนเงิน</TableHead>
+                    <TableHead>หมายเหตุ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -543,45 +544,45 @@ export default function VNextFinanceInvoiceDetail() {
         <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
           <Card>
             <CardContent className="p-5">
-              <h3 className="mb-4 text-base font-semibold">Invoice Details</h3>
+              <h3 className="mb-4 text-base font-semibold">รายละเอียดใบแจ้งหนี้</h3>
               <dl className="space-y-3 text-sm">
                 <div>
-                  <dt className="text-xs text-muted-foreground">Customer</dt>
+                  <dt className="text-xs text-muted-foreground">ลูกค้า</dt>
                   <dd>{i.customer.name}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">Issue Date</dt>
+                  <dt className="text-xs text-muted-foreground">วันที่ออก</dt>
                   <dd>{formatDate(i.issueDate)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">Due Date</dt>
+                  <dt className="text-xs text-muted-foreground">วันครบกำหนด</dt>
                   <dd className={cn(isPastDue && 'text-destructive')}>{formatDate(i.dueDate)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">Payment Terms</dt>
-                  <dd>Net {i.paymentTermsDays}</dd>
+                  <dt className="text-xs text-muted-foreground">เงื่อนไขการชำระ</dt>
+                  <dd>{i.paymentTermsDays} วัน</dd>
                 </div>
                 {i.sentAt && (
                   <div>
-                    <dt className="text-xs text-muted-foreground">Sent</dt>
+                    <dt className="text-xs text-muted-foreground">ส่งบิลแล้ว</dt>
                     <dd>{formatDate(i.sentAt)}</dd>
                   </div>
                 )}
                 {i.paidAt && (
                   <div>
-                    <dt className="text-xs text-muted-foreground">Paid</dt>
+                    <dt className="text-xs text-muted-foreground">ชำระแล้ว</dt>
                     <dd>{formatDate(i.paidAt)}</dd>
                   </div>
                 )}
                 {i.notes && (
                   <div>
-                    <dt className="text-xs text-muted-foreground">Notes</dt>
+                    <dt className="text-xs text-muted-foreground">หมายเหตุ</dt>
                     <dd>{i.notes}</dd>
                   </div>
                 )}
                 {i.internalNotes && (
                   <div>
-                    <dt className="text-xs text-muted-foreground">Internal Notes</dt>
+                    <dt className="text-xs text-muted-foreground">หมายเหตุภายใน</dt>
                     <dd className="italic">{i.internalNotes}</dd>
                   </div>
                 )}

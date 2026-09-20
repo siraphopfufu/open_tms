@@ -145,22 +145,20 @@ export class InvoicingService implements IInvoicingService {
   }
 
   async findReadyToInvoice(orgId: string, customerId?: string): Promise<ReadyToInvoiceShipment[]> {
-    // Find shipments that have billing status = ready_to_invoice
-    const summaries = await this.prisma.shipmentFinancialSummary.findMany({
-      where: {
-        orgId,
-        billingStatus: 'ready_to_invoice',
-      },
-      select: { shipmentId: true },
-    });
-
-    if (summaries.length === 0) return [];
-
-    const shipmentIds = summaries.map(s => s.shipmentId);
-
+    // Readiness is computed live from three conditions rather than trusting
+    // ShipmentFinancialSummary.billingStatus: that field is only ever written
+    // by BillingTriggerHandler, which listens for the shipment.delivered
+    // *event* — an EDI-milestone concept. A manually-dispatched job (no EDI,
+    // e.g. every Thai drayage trip) never fires that event, so the stored
+    // summary silently never advances and this endpoint would always return
+    // nothing for that entire workflow. Computing readiness on read instead
+    // makes it correct for both paths.
     const shipments = await this.prisma.shipment.findMany({
       where: {
-        id: { in: shipmentIds },
+        orgId,
+        status: 'complete',
+        archived: false,
+        deletedAt: null,
         ...(customerId && { customerId }),
       },
       select: {
@@ -172,13 +170,23 @@ export class InvoicingService implements IInvoicingService {
       },
     });
 
-    // Single batch query for all approved revenue charges across all candidate
-    // shipments, then group in memory — was previously one query per shipment.
-    const allCharges = await this.chargeRepo.findAll({
-      shipmentIds: shipments.map(s => s.id),
-      chargeCategory: 'revenue',
-      status: 'approved',
-    });
+    if (shipments.length === 0) return [];
+    const shipmentIds = shipments.map(s => s.id);
+
+    const [allCharges, podAttachments, existingLineItems] = await Promise.all([
+      this.chargeRepo.findAll({ shipmentIds, chargeCategory: 'revenue', status: 'approved' }),
+      // Delivery-document gate (PoC demo definition-of-done): a completed
+      // trip isn't billable until a document is attached against it. Any
+      // attachment counts for now — there's no dedicated "delivery note" type.
+      this.prisma.attachment.findMany({
+        where: { entityType: 'shipment', entityId: { in: shipmentIds } },
+        select: { entityId: true },
+      }),
+      this.prisma.invoiceLineItem.findMany({
+        where: { shipmentId: { in: shipmentIds } },
+        select: { shipmentId: true },
+      }),
+    ]);
 
     const chargesByShipment = new Map<string, typeof allCharges>();
     for (const charge of allCharges) {
@@ -187,10 +195,14 @@ export class InvoicingService implements IInvoicingService {
       if (list) list.push(charge);
       else chargesByShipment.set(charge.shipmentId, [charge]);
     }
+    const podByShipment = new Set(podAttachments.map(a => a.entityId));
+    const alreadyInvoiced = new Set(existingLineItems.map(li => li.shipmentId).filter(Boolean) as string[]);
 
     const results: ReadyToInvoiceShipment[] = [];
 
     for (const shipment of shipments) {
+      if (alreadyInvoiced.has(shipment.id)) continue;
+      if (!podByShipment.has(shipment.id)) continue;
       const charges = chargesByShipment.get(shipment.id) ?? [];
       if (charges.length > 0) {
         results.push({

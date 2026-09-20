@@ -40,11 +40,12 @@ interface ReadyShipment {
 }
 
 function formatMoney(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `฿${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function formatDate(d?: string | null): string {
   if (!d) return '-';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const date = new Date(d);
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
 export default function VNextFinanceCreateInvoice() {
@@ -114,7 +115,7 @@ export default function VNextFinanceCreateInvoice() {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-muted-foreground">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <h3 className="text-lg font-medium">Loading...</h3>
+        <h3 className="text-lg font-medium">กำลังโหลด...</h3>
       </div>
     );
   }
@@ -131,23 +132,23 @@ export default function VNextFinanceCreateInvoice() {
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm">
         <Button variant="ghost" size="sm" onClick={() => navigate('/finance/invoices')}>
-          <ArrowLeft className="h-4 w-4" /> Invoices
+          <ArrowLeft className="h-4 w-4" /> ใบแจ้งหนี้
         </Button>
-        <span className="text-muted-foreground">/ Create Invoice</span>
+        <span className="text-muted-foreground">/ วางบิล</span>
       </div>
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Create Invoice</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Select delivered shipments with approved charges to invoice</p>
+          <h1 className="text-3xl font-bold tracking-tight">วางบิล</h1>
+          <p className="mt-1 text-sm text-muted-foreground">เลือกเที่ยวที่ส่งถึงแล้วและมีค่าระวางอนุมัติแล้วเพื่อวางบิล</p>
         </div>
       </div>
 
       {shipments.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
           <Receipt className="h-10 w-10" />
-          <h3 className="text-base font-medium">No shipments ready to invoice</h3>
-          <p className="max-w-md text-sm">Shipments are marked as ready to invoice when they are delivered and have approved revenue charges.</p>
+          <h3 className="text-base font-medium">ยังไม่มีเที่ยวที่พร้อมวางบิล</h3>
+          <p className="max-w-md text-sm">เที่ยวจะพร้อมวางบิลเมื่อส่งถึงแล้วและมีค่าระวางที่อนุมัติแล้ว</p>
         </div>
       ) : (
         <>
@@ -161,13 +162,13 @@ export default function VNextFinanceCreateInvoice() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Customers</SelectItem>
+                  <SelectItem value="all">ลูกค้าทั้งหมด</SelectItem>
                   {customers.map(([id, name]) => (
                     <SelectItem key={id} value={id}>{name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <span className="text-sm text-muted-foreground">{filtered.length} shipments ready</span>
+              <span className="text-sm text-muted-foreground">{filtered.length} เที่ยวพร้อมวางบิล</span>
             </div>
 
             <Table>
@@ -181,11 +182,11 @@ export default function VNextFinanceCreateInvoice() {
                       onChange={selectAll}
                     />
                   </TableHead>
-                  <TableHead>Shipment</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Charges</TableHead>
-                  <TableHead>Delivered</TableHead>
+                  <TableHead>เที่ยว</TableHead>
+                  <TableHead>ลูกค้า</TableHead>
+                  <TableHead className="text-right">ค่าระวาง</TableHead>
+                  <TableHead className="text-right">รายการ</TableHead>
+                  <TableHead>วันที่ส่งถึง</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -221,23 +222,23 @@ export default function VNextFinanceCreateInvoice() {
               <CardContent className="p-5">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex flex-wrap items-center gap-3">
-                    <strong>{selected.size} shipment{selected.size > 1 ? 's' : ''} selected</strong>
+                    <strong>เลือก {selected.size} เที่ยว</strong>
                     <span className="text-muted-foreground">|</span>
                     <strong className="text-lg font-mono tabular-nums">{formatMoney(totalRevenue)}</strong>
                     {selectedCustomers.length > 1 && (
-                      <Badge variant="destructive">Multiple customers - select only one</Badge>
+                      <Badge variant="destructive">เลือกลูกค้าได้ทีละราย</Badge>
                     )}
                   </div>
                   <div className="flex items-end gap-2">
                     <Input
-                      placeholder="Invoice notes (optional)"
+                      placeholder="หมายเหตุใบแจ้งหนี้ (ถ้ามี)"
                       value={notes}
                       onChange={e => setNotes(e.target.value)}
                       className="w-[250px]"
                     />
                     <Button onClick={createInvoice} disabled={!canCreate || creating}>
                       <Receipt className="h-4 w-4" />
-                      {creating ? 'Creating...' : 'Create Invoice'}
+                      {creating ? 'กำลังสร้าง...' : 'สร้างใบแจ้งหนี้'}
                     </Button>
                   </div>
                 </div>

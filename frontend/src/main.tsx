@@ -17,6 +17,9 @@ import VNextDashboard from './vnext-design/VNextDashboard';
 import VNextShipments from './vnext-design/VNextShipments';
 import VNextDispatchBoard from './vnext-design/VNextDispatchBoard';
 import VNextCashDesk from './vnext-design/VNextCashDesk';
+import VNextJobsToday from './vnext-design/VNextJobsToday';
+import VNextNewJob from './vnext-design/VNextNewJob';
+import VNextJobDetail from './vnext-design/VNextJobDetail';
 import VNextShipmentDetail from './vnext-design/VNextShipmentDetail';
 import VNextOrders from './vnext-design/VNextOrders';
 import VNextIssueDetail from './vnext-design/VNextIssueDetail';
@@ -319,6 +322,11 @@ root.render(
           <Route path="shipments/:id" element={<VNextShipmentDetail />} />
           <Route path="dispatch" element={<VNextDispatchBoard />} />
           <Route path="cash-desk" element={<VNextCashDesk />} />
+
+          {/* Jobs (Boonchai PoC demo) */}
+          <Route path="jobs" element={<VNextJobsToday />} />
+          <Route path="jobs/new" element={<VNextNewJob />} />
+          <Route path="jobs/:id" element={<VNextJobDetail />} />
 
           {/* Orders */}
           <Route path="orders" element={<VNextOrders />} />

@@ -57,6 +57,7 @@ export interface CreateShipmentPayload {
   shipmentTypeId?: string;
   proNumber?: string;
   serviceLevel?: string;
+  direction?: string;
   items?: Array<{
     sku: string;
     description?: string;
@@ -251,6 +252,7 @@ export class CreateShipmentCommandHandler extends BaseCommandHandler<CreateShipm
         shipmentTypeId: body.shipmentTypeId,
         proNumber: body.proNumber,
         serviceLevel: body.serviceLevel,
+        direction: body.direction,
         items: body.items ?? [],
         status: 'draft',
         tempControlled: body.tempControlled ?? false,

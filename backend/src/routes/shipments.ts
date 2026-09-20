@@ -196,6 +196,7 @@ export async function shipmentRoutes(server: FastifyInstance) {
       shipmentTypeId: z.string().uuid().optional(),
       proNumber: z.string().optional(),
       serviceLevel: z.enum(['FTL', 'LTL']).optional(),
+      direction: z.enum(['import', 'export', 'reposition']).optional(),
       items: z.array(z.object({
         sku: z.string(),
         description: z.string().optional(),

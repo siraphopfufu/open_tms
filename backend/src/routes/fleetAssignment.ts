@@ -81,6 +81,54 @@ export async function fleetAssignmentRoutes(server: FastifyInstance) {
     }
   });
 
+  // ─── Driver Availability ────────────────────────────────────────────────────
+  // PoC demo definition-of-done item: "Driver availability list shows ว่าง /
+  // ไม่ว่าง for company trucks". A driver is ไม่ว่าง (busy) if they're
+  // currently loaded onto a shipment that's in progress; ว่าง (available)
+  // otherwise. Scoped to own-fleet carriers only — subcontractor drivers
+  // aren't ours to schedule.
+
+  server.get('/api/v1/fleet/driver-availability', {
+    schema: { tags: ['Fleet'], description: 'Company-fleet drivers with ว่าง/ไม่ว่าง availability derived from today\'s active trips' },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const orgId = req.orgId!;
+    try {
+      const drivers = await server.prisma.driver.findMany({
+        where: { orgId, carrier: { isOwnFleet: true } },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          carrier: { select: { id: true, name: true } },
+          loads: {
+            select: {
+              shipment: { select: { id: true, reference: true, status: true } },
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      const rows = drivers.map(d => {
+        const activeLoad = d.loads.find(l => l.shipment.status === 'in_progress');
+        return {
+          id: d.id,
+          name: d.name,
+          phone: d.phone,
+          carrierId: d.carrier.id,
+          carrierName: d.carrier.name,
+          available: !activeLoad,
+          currentShipmentReference: activeLoad?.shipment.reference ?? null,
+        };
+      });
+
+      return { data: rows, error: null };
+    } catch (err: any) {
+      reply.code(500);
+      return { data: null, error: err.message };
+    }
+  });
+
   // ─── Vehicles ───────────────────────────────────────────────────────────────
 
   server.get('/api/v1/carriers/:id/vehicles', {

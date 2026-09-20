@@ -48,6 +48,7 @@ import {
   Moon,
   Package,
   Palette,
+  Plus,
   RefreshCcw,
   Receipt,
   Route,
@@ -146,7 +147,11 @@ interface AppDef {
   requiredAnyPermission?: string[];
 }
 
-const APPS: AppDef[] = [
+// Full English admin nav — kept intact (not deleted) per the PoC brief's
+// "hide, don't delete" rule, but not rendered while DEMO_MODE is on below.
+// Every route it points to is still registered in main.tsx and reachable by
+// direct URL; this array just controls what the sidebar links to.
+const FULL_APPS: AppDef[] = [
   {
     key: 'operations', icon: Truck, label: 'Operations', basePath: '/',
     sections: [
@@ -333,6 +338,30 @@ const APPS: AppDef[] = [
     ],
   },
 ];
+
+// PoC demo nav (Boonchai job-to-billing walkthrough): exactly five Thai
+// items, no app switcher, nothing else visible. Everything FULL_APPS points
+// to is still registered in main.tsx — this is purely a frontend view, per
+// the brief's "hide, don't delete" rule.
+const DEMO_APPS: AppDef[] = [
+  {
+    key: 'demo', icon: Truck, label: 'บุญชัย ทรานสปอร์ต', basePath: '/jobs',
+    sections: [
+      { title: '', items: [
+        { to: '/jobs', icon: Calendar, label: 'งานวันนี้', end: true },
+        { to: '/jobs/new', icon: Plus, label: 'เปิดงานใหม่' },
+        { to: '/finance/invoices/create', icon: Receipt, label: 'วางบิล' },
+        { to: '/carriers', icon: Truck, label: 'รถและรถร่วม' },
+        { to: '/customers', icon: Users, label: 'ลูกค้าและสถานที่' },
+      ]},
+    ],
+  },
+];
+
+// Flip to `false` to bring back the full English admin nav (e.g. for
+// continuing non-demo feature work) without deleting any of the above.
+const DEMO_MODE = true;
+const APPS: AppDef[] = DEMO_MODE ? DEMO_APPS : FULL_APPS;
 
 /* ── Global search ──────────────────────────────────── */
 interface SearchResults {
@@ -664,15 +693,17 @@ export default function VNextLayout() {
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => setAppGridOpen(true)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-              aria-label="Switch app"
-              title="Switch app"
-            >
-              <Grid3x3 className="h-4 w-4" />
-            </button>
+            {visibleApps.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setAppGridOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                aria-label="Switch app"
+                title="Switch app"
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </button>
+            )}
 
             <button
               type="button"
