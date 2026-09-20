@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Paperclip, Upload } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Link2, Loader2, Paperclip, Upload } from 'lucide-react';
 
 import { API_URL } from '../api';
 import { Button } from '@/components/ui/button';
@@ -74,6 +74,9 @@ function DispatchSection({ shipmentId, c, onDone }: { shipmentId: string; c: any
   const [newCarrierName, setNewCarrierName] = useState('');
   const [newCarrierPlate, setNewCarrierPlate] = useState('');
   const [newCarrierTaxId, setNewCarrierTaxId] = useState('');
+  const [newCarrierPhone, setNewCarrierPhone] = useState('');
+  const [newCarrierNationalId, setNewCarrierNationalId] = useState('');
+  const [newCarrierTrailerPlate, setNewCarrierTrailerPlate] = useState('');
 
   useEffect(() => {
     fetch(`${API_URL}/api/v1/carriers`).then(r => r.json()).then(j => setCarriers(j.data || [])).catch(() => {});
@@ -99,7 +102,13 @@ function DispatchSection({ shipmentId, c, onDone }: { shipmentId: string; c: any
     try {
       const carrierRes = await fetch(`${API_URL}/api/v1/carriers`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newCarrierName, taxId: newCarrierTaxId || undefined, isOwnFleet: false, country: 'Thailand', currency: 'THB' }),
+        body: JSON.stringify({
+          name: newCarrierName,
+          taxId: newCarrierTaxId || undefined,
+          nationalId: newCarrierNationalId || undefined,
+          contactPhone: newCarrierPhone || undefined,
+          isOwnFleet: false, country: 'Thailand', currency: 'THB',
+        }),
       });
       const carrierJson = await carrierRes.json();
       if (carrierJson.error) throw new Error(carrierJson.error);
@@ -111,7 +120,7 @@ function DispatchSection({ shipmentId, c, onDone }: { shipmentId: string; c: any
       if (vehicleJson.error) throw new Error(vehicleJson.error);
       const assignRes = await fetch(`${API_URL}/api/v1/shipments/${shipmentId}/load`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vehicleId: vehicleJson.data.id }),
+        body: JSON.stringify({ vehicleId: vehicleJson.data.id, trailerPlate: newCarrierTrailerPlate || undefined }),
       });
       const assignJson = await assignRes.json();
       if (assignJson.error) throw new Error(assignJson.error);
@@ -192,8 +201,11 @@ function DispatchSection({ shipmentId, c, onDone }: { shipmentId: string; c: any
           <p className="text-xs text-muted-foreground">รถร่วมใหม่ — ไม่มีโควตา ไม่มีค่าธรรมเนียมต่อคัน</p>
           <Input placeholder="ชื่อผู้รับจ้าง / บริษัท" value={newCarrierName} onChange={e => setNewCarrierName(e.target.value)} />
           <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="ทะเบียนรถ" value={newCarrierPlate} onChange={e => setNewCarrierPlate(e.target.value)} />
+            <Input placeholder="ทะเบียนหัวลาก" value={newCarrierPlate} onChange={e => setNewCarrierPlate(e.target.value)} />
+            <Input placeholder="ทะเบียนหางลาก" value={newCarrierTrailerPlate} onChange={e => setNewCarrierTrailerPlate(e.target.value)} />
             <Input placeholder="เลขผู้เสียภาษี" value={newCarrierTaxId} onChange={e => setNewCarrierTaxId(e.target.value)} />
+            <Input placeholder="เลขบัตรประชาชน" value={newCarrierNationalId} onChange={e => setNewCarrierNationalId(e.target.value)} />
+            <Input placeholder="เบอร์โทร" value={newCarrierPhone} onChange={e => setNewCarrierPhone(e.target.value)} />
           </div>
           <Button size="sm" onClick={createSubcontractorAndAssign} disabled={busy || !newCarrierName.trim() || !newCarrierPlate.trim()}>
             {busy ? 'กำลังบันทึก...' : 'บันทึกและจัดรถ'}
@@ -319,7 +331,24 @@ function ContainerCard({ c, onDone }: { c: any; onDone: () => void }) {
   const [printing, setPrinting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [delivering, setDelivering] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const createShareLink = async () => {
+    setSharing(true);
+    try {
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const res = await fetch(`${API_URL}/api/v1/shipments/${c.shipmentId}/share-links`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections: ['overview', 'events', 'documents'], expiresAt, label: 'ลิงก์ติดตามสำหรับลูกค้า' }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setShareUrl(json.data.url);
+    } catch (e: any) { alert(e.message); }
+    finally { setSharing(false); }
+  };
 
   const markDelivered = async () => {
     setDelivering(true);
@@ -407,8 +436,17 @@ function ContainerCard({ c, onDone }: { c: any; onDone: () => void }) {
           {c.attachmentCount > 0 && (
             <span className="text-xs text-muted-foreground flex items-center gap-1"><Paperclip className="h-3 w-3" /> {c.attachmentCount} ไฟล์</span>
           )}
+          <Button size="sm" variant="outline" onClick={createShareLink} disabled={sharing}>
+            <Link2 className="h-4 w-4" /> {sharing ? 'กำลังสร้างลิงก์...' : 'ลิงก์ติดตามสำหรับลูกค้า'}
+          </Button>
           {c.revenueCents > 0 && <span className="ml-auto text-xs text-muted-foreground">ค่าระวาง: {baht(c.revenueCents)}</span>}
         </div>
+        {shareUrl && (
+          <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-2 text-xs">
+            <span className="truncate flex-1">{shareUrl}</span>
+            <Button size="sm" variant="ghost" onClick={() => navigator.clipboard?.writeText(shareUrl)}>คัดลอก</Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

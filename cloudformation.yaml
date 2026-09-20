@@ -324,6 +324,8 @@ Resources:
               Value: "3001"
             - Name: JWT_SECRET
               Value: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
+            - Name: PUBLIC_URL
+              Value: !Sub "http://${ALB.DNSName}"
           LogConfiguration:
             LogDriver: awslogs
             Options:
