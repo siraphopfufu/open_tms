@@ -3125,7 +3125,7 @@ async function seedThaiFleetSettlementDemo(orgId: string, shipment: any, locatio
     data: { orgId, name: 'Boonchai Transport - Own Fleet', country: 'Thailand', currency: 'THB', isOwnFleet: true },
   });
   const ownVehicle = await prisma.vehicle.create({
-    data: { orgId, carrierId: ownFleet.id, plate: '70-1234 ชบ.', type: 'tractor', standardKmPerLiter: 3.2 },
+    data: { orgId, carrierId: ownFleet.id, plate: '70-1234 ชลบุรี', type: 'tractor', standardKmPerLiter: 3.2 },
   });
   const ownDriver = await prisma.driver.create({
     data: { orgId, carrierId: ownFleet.id, name: 'สมหมาย ใจดี', phone: '081-234-5678', standardAllowanceCents: 30000 },
@@ -3136,7 +3136,7 @@ async function seedThaiFleetSettlementDemo(orgId: string, shipment: any, locatio
       shipmentId: shipment.id,
       vehicleId: ownVehicle.id,
       driverId: ownDriver.id,
-      trailerPlate: '70-5678 ชบ.',
+      trailerPlate: '70-5678 ชลบุรี',
       assignedAt: daysAgo(3),
     },
   });
@@ -3215,7 +3215,7 @@ async function seedThaiFleetSettlementDemo(orgId: string, shipment: any, locatio
     },
   });
   const subVehicle = await prisma.vehicle.create({
-    data: { orgId, carrierId: subcontractor.id, plate: '71-9988 ชบ.', type: 'tractor', standardKmPerLiter: 3.2 },
+    data: { orgId, carrierId: subcontractor.id, plate: '71-9988 ชลบุรี', type: 'tractor', standardKmPerLiter: 3.2 },
   });
   const subDriver = await prisma.driver.create({
     data: { orgId, carrierId: subcontractor.id, name: 'สมชาย รักงาน', phone: '089-876-5432' },
@@ -3237,7 +3237,7 @@ async function seedThaiFleetSettlementDemo(orgId: string, shipment: any, locatio
     },
   });
   await prisma.load.create({
-    data: { shipmentId: subShipment.id, vehicleId: subVehicle.id, driverId: subDriver.id, trailerPlate: '71-1122 ชบ.', assignedAt: daysAgo(2) },
+    data: { shipmentId: subShipment.id, vehicleId: subVehicle.id, driverId: subDriver.id, trailerPlate: '71-1122 ชลบุรี', assignedAt: daysAgo(2) },
   });
 
   const subAdvance = await prisma.driverAdvance.create({

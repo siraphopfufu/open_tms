@@ -28,6 +28,7 @@ export interface IDocumentGenerationService {
   generateInvoicePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateWithholdingCertificatePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateJobSheetPdf(shipmentId: string, userId?: string): Promise<{ id: string; fileName: string }>;
+  renderJobSheetHtml(shipmentId: string): Promise<string>;
   generateReceiptPdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
 }
 
@@ -504,7 +505,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     return { id: doc.id, fileName };
   }
 
-  async generateJobSheetPdf(shipmentId: string, userId?: string) {
+  private async buildJobSheetData(shipmentId: string) {
     const shipment = await this.prisma.shipment.findUniqueOrThrow({
       where: { id: shipmentId },
       include: {
@@ -519,22 +520,84 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const load = shipment.loads[0];
     const branding = await this.loadBranding();
 
-    const data = {
-      branding,
+    return {
       reference: shipment.reference,
-      pickupDate: formatDate(shipment.pickupDate),
-      tractorPlate: load?.vehicle?.plate || '-',
-      trailerPlate: load?.trailerPlate || '-',
-      driverName: load?.driver?.name || '-',
-      driverPhone: load?.driver?.phone || '-',
-      bookingNumber: shipment.shippingContainer?.bookingNumber || '-',
-      containerNumber: shipment.shippingContainer?.containerNumber || '-',
-      containerSize: shipment.shippingContainer?.sizeType || '-',
-      sealNumber: shipment.shippingContainer?.sealNumber || '-',
-      originName: shipment.origin ? `${shipment.origin.name} (${shipment.origin.city})` : '-',
-      destinationName: shipment.destination ? `${shipment.destination.name} (${shipment.destination.city})` : '-',
-      advanceAmount: shipment.driverAdvance ? `฿${(shipment.driverAdvance.totalAdvanceCents / 100).toFixed(2)}` : '-',
+      data: {
+        branding,
+        reference: shipment.reference,
+        pickupDate: formatDate(shipment.pickupDate),
+        tractorPlate: load?.vehicle?.plate || '-',
+        trailerPlate: load?.trailerPlate || '-',
+        driverName: load?.driver?.name || '-',
+        driverPhone: load?.driver?.phone || '-',
+        bookingNumber: shipment.shippingContainer?.bookingNumber || '-',
+        containerNumber: shipment.shippingContainer?.containerNumber || '-',
+        containerSize: shipment.shippingContainer?.sizeType || '-',
+        sealNumber: shipment.shippingContainer?.sealNumber || '-',
+        originName: shipment.origin ? `${shipment.origin.name} (${shipment.origin.city})` : '-',
+        destinationName: shipment.destination ? `${shipment.destination.name} (${shipment.destination.city})` : '-',
+        advanceAmount: shipment.driverAdvance ? `฿${(shipment.driverAdvance.totalAdvanceCents / 100).toFixed(2)}` : '-',
+      },
     };
+  }
+
+  /**
+   * Renders the job sheet as a standalone, print-styled HTML document instead
+   * of a pdf-lib PDF. pdf-lib's drawText has no complex-script shaping, so
+   * Thai combining vowels/tone marks misplace even with a correctly embedded
+   * font (see the PoC brief, section 6, "Thai PDFs"). Handing the same
+   * Handlebars-rendered markup to the browser's own text engine instead — via
+   * a real Thai web font and window.print() — renders correctly because the
+   * browser does the shaping pdf-lib skips.
+   */
+  async renderJobSheetHtml(shipmentId: string): Promise<string> {
+    const { data } = await this.buildJobSheetData(shipmentId);
+    const body = Handlebars.compile(defaultJobSheetTemplate)(data);
+    return `<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>${data.reference} — ใบสั่งงานคนขับ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Noto Sans Thai", "Noto Sans", sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #111;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+  h1 { font-size: 22px; margin: 4px 0; }
+  h2 { font-size: 15px; margin: 20px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  td { padding: 3px 6px; vertical-align: top; }
+  strong { font-weight: 700; }
+  .print-bar { text-align: right; margin-bottom: 16px; }
+  .print-bar button {
+    font-family: inherit; font-size: 14px; padding: 8px 18px;
+    background: #4f46e5; color: #fff; border: none; border-radius: 6px; cursor: pointer;
+  }
+  @media print {
+    .print-bar { display: none; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="print-bar"><button onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button></div>
+${body}
+</body>
+</html>`;
+  }
+
+  async generateJobSheetPdf(shipmentId: string, userId?: string) {
+    const { reference, data } = await this.buildJobSheetData(shipmentId);
+    const shipment = { reference };
 
     const html = Handlebars.compile(defaultJobSheetTemplate)(data);
     const pdfBytes = await this.htmlToPdf(html, `Job Sheet - ${shipment.reference}`);

@@ -364,18 +364,15 @@ function ContainerCard({ c, onDone }: { c: any; onDone: () => void }) {
   const printJobSheet = async () => {
     setPrinting(true);
     try {
-      const genRes = await fetch(`${API_URL}/api/v1/documents/job-sheet-pdf`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipmentId: c.shipmentId }),
-      });
-      const genJson = await genRes.json();
-      if (genJson.error) throw new Error(genJson.error);
-      const dlRes = await fetch(`${API_URL}/api/v1/documents/${genJson.data.id}/download`);
-      const blob = await dlRes.blob();
+      // Opens print-styled HTML (correct Thai text shaping) rather than the
+      // pdf-lib PDF, which misplaces Thai combining marks — see backend
+      // route comment on /api/v1/documents/job-sheet-html.
+      const res = await fetch(`${API_URL}/api/v1/documents/job-sheet-html/${c.shipmentId}`);
+      if (!res.ok) throw new Error('สร้างใบปฏิบัติงานไม่สำเร็จ');
+      const html = await res.text();
+      const blob = new Blob([html], { type: 'text/html' });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = genJson.data.fileName; a.click();
-      window.URL.revokeObjectURL(url);
+      window.open(url, '_blank');
     } catch (e: any) { alert(e.message); }
     finally { setPrinting(false); }
   };
@@ -383,11 +380,13 @@ function ContainerCard({ c, onDone }: { c: any; onDone: () => void }) {
   const attachDocument = async (file: File) => {
     setUploading(true);
     try {
+      // @fastify/multipart's req.file() only has fields that arrive BEFORE
+      // the file part in the multipart body — append text fields first.
       const form = new FormData();
-      form.append('file', file);
       form.append('entityType', 'shipment');
       form.append('entityId', c.shipmentId);
       form.append('description', 'ใบส่งของ / เอกสารกลับ');
+      form.append('file', file);
       const res = await fetch(`${API_URL}/api/v1/attachments`, { method: 'POST', body: form });
       const json = await res.json();
       if (json.error) throw new Error(json.error);

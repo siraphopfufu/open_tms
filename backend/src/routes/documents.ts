@@ -560,6 +560,34 @@ export async function documentRoutes(server: FastifyInstance) {
     }
   });
 
+  // pdf-lib's drawText has no complex-script shaping, so Thai combining
+  // vowels/tone marks misplace even with a correct font embedded (see the
+  // PoC brief, section 6, "Thai PDFs"). This returns the same job sheet as
+  // print-styled HTML instead, so the browser's own text engine — which does
+  // shape Thai correctly — renders it, and the user prints/saves as PDF.
+  server.get('/api/v1/documents/job-sheet-html/:shipmentId', {
+    preHandler: requirePermission('documents:generate'),
+    schema: {
+      description: 'Render the A4 driver job sheet as print-styled HTML (correct Thai text shaping, unlike the pdf-lib job-sheet-pdf route)',
+      tags: ['Documents'],
+      params: {
+        type: 'object',
+        required: ['shipmentId'],
+        properties: { shipmentId: { type: 'string' } },
+      },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { shipmentId } = req.params as { shipmentId: string };
+    try {
+      const html = await docService.renderJobSheetHtml(shipmentId);
+      reply.type('text/html');
+      return html;
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
   server.post('/api/v1/documents/job-sheet-pdf', {
     preHandler: requirePermission('documents:generate'),
     schema: {
