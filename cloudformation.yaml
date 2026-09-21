@@ -272,6 +272,8 @@ Resources:
             Value: !GetAtt FrontendRepo.RepositoryUri
           - Name: ALB_DNS
             Value: !GetAtt ALB.DNSName
+          - Name: PUBLIC_DOMAIN
+            Value: !Ref DomainName
       Source:
         Type: GITHUB
         Location: !Ref GitHubRepo
@@ -287,7 +289,7 @@ Resources:
                 - echo "Building backend image..."
                 - docker build -f backend/Dockerfile -t $BACKEND_REPO_URI:latest .
                 - echo "Building frontend image..."
-                - docker build -f frontend/Dockerfile --build-arg VITE_API_URL=http://$ALB_DNS -t $FRONTEND_REPO_URI:latest .
+                - docker build -f frontend/Dockerfile --build-arg VITE_API_URL=https://$PUBLIC_DOMAIN -t $FRONTEND_REPO_URI:latest .
             post_build:
               commands:
                 - docker push $BACKEND_REPO_URI:latest
@@ -344,7 +346,7 @@ Resources:
             - Name: JWT_SECRET
               Value: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
             - Name: PUBLIC_URL
-              Value: !Sub "http://${ALB.DNSName}"
+              Value: !Sub "https://${DomainName}"
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -376,7 +378,7 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: VITE_API_URL
-              Value: !Sub "http://${ALB.DNSName}"
+              Value: !Sub "https://${DomainName}"
           LogConfiguration:
             LogDriver: awslogs
             Options:
