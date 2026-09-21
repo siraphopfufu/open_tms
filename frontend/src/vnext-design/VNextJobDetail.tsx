@@ -28,7 +28,7 @@ function StatusStrip({ c }: { c: any }) {
     { label: 'ขนส่ง', ok: c.status === 'complete', text: c.status === 'complete' ? 'ส่งถึงแล้ว' : c.status === 'in_progress' ? 'กำลังขนส่ง' : 'ยังไม่ออกรถ' },
     { label: 'เอกสาร', ok: c.podReceived, text: c.podReceived ? `แนบแล้ว (${c.attachmentCount})` : 'ขาดใบส่งของ' },
     { label: 'ค่าใช้จ่าย', ok: c.netSettlementCents != null, text: c.netSettlementCents != null ? 'เคลียร์บิลแล้ว' : 'ยังไม่เคลียร์บิล' },
-    { label: 'วางบิล', ok: !!c.invoiceNumber, text: c.invoiceNumber || (c.status === 'complete' && c.podReceived ? 'พร้อมวางบิล' : 'ยังวางไม่ได้') },
+    { label: 'วางบิล', ok: !!c.invoiceNumber, text: c.invoiceNumber || (c.status === 'complete' && c.podReceived && c.revenueCents > 0 ? 'พร้อมวางบิล' : 'ยังวางไม่ได้') },
     { label: 'รับเงิน', ok: c.invoiceStatus === 'paid', text: c.invoiceStatus === 'paid' ? 'รับเงินแล้ว' : c.invoiceNumber ? 'รอรับเงิน' : '—' },
     { label: 'จ่ายรถร่วม', ok: c.vehicle?.isOwnFleet ? null : (c.netSettlementCents != null ? true : null), text: c.vehicle?.isOwnFleet ? 'รถบริษัท' : (c.netSettlementCents != null ? 'เคลียร์แล้ว' : 'รอเคลียร์') },
   ];
@@ -39,6 +39,7 @@ function StatusStrip({ c }: { c: any }) {
   else if (!c.advance) nextAction = 'ยังไม่เบิกเงินทดรอง';
   else if (c.netSettlementCents == null) nextAction = 'ยังไม่เคลียร์บิล';
   else if (!c.podReceived) nextAction = `ขาดใบส่งของ: ${c.reference}`;
+  else if (c.revenueCents <= 0) nextAction = `ยังไม่ได้ตั้งค่าระวาง: ${c.reference}`;
   else if (!c.invoiceNumber) nextAction = 'พร้อมวางบิล';
   else nextAction = 'เรียบร้อย';
 
