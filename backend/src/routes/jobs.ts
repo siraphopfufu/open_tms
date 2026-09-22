@@ -191,8 +191,12 @@ export async function jobRoutes(server: FastifyInstance) {
       reply.code(201);
       return { data: result, error: null };
     } catch (err: any) {
+      if (err.code === 'P2002' && err.meta?.target?.includes?.('containerNumber')) {
+        reply.code(409);
+        return { data: null, error: 'เลขตู้นี้มีอยู่ในระบบแล้ว กรุณาใช้เลขตู้อื่น (This container number is already in use — pick a different one)' };
+      }
       reply.code(400);
-      return { data: null, error: err.message };
+      return { data: null, error: 'ไม่สามารถเปิดงานได้ กรุณาลองอีกครั้ง (Could not create the job — please try again)' };
     }
   });
 
