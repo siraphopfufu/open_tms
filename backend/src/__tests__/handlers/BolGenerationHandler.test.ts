@@ -15,10 +15,13 @@ function build(loadPlan: { id: string; bolDocumentId: string | null } | null = {
     generateCustomsForm: jest.fn(),
     generateRateConfirmation: jest.fn(),
     generateInvoicePdf: jest.fn(),
+    renderInvoiceHtml: jest.fn(),
     generateWithholdingCertificatePdf: jest.fn(),
+    renderWithholdingCertificateHtml: jest.fn(),
     generateJobSheetPdf: jest.fn(),
     renderJobSheetHtml: jest.fn(),
     generateReceiptPdf: jest.fn(),
+    renderReceiptHtml: jest.fn(),
   };
   const { bus, fannedOut } = mockEventBus();
 

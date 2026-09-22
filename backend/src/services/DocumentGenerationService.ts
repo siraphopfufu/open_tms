@@ -26,10 +26,13 @@ export interface IDocumentGenerationService {
   generateCustomsForm(shipmentId: string, templateId?: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateRateConfirmation(shipmentId: string, userId?: string): Promise<{ id: string; fileName: string }>;
   generateInvoicePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
+  renderInvoiceHtml(invoiceId: string): Promise<string>;
   generateWithholdingCertificatePdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
+  renderWithholdingCertificateHtml(invoiceId: string): Promise<string>;
   generateJobSheetPdf(shipmentId: string, userId?: string): Promise<{ id: string; fileName: string }>;
   renderJobSheetHtml(shipmentId: string): Promise<string>;
   generateReceiptPdf(invoiceId: string, userId?: string): Promise<{ id: string; fileName: string }>;
+  renderReceiptHtml(invoiceId: string): Promise<string>;
 }
 
 function formatDate(d: Date | null | undefined): string {
@@ -402,7 +405,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     return { id: doc.id, fileName };
   }
 
-  async generateInvoicePdf(invoiceId: string, userId?: string) {
+  private async buildInvoiceData(invoiceId: string) {
     const invoice = await this.prisma.invoice.findUniqueOrThrow({
       where: { id: invoiceId },
       include: { lineItems: true, customer: true },
@@ -414,28 +417,43 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const hasThaiTax = invoice.vatCents > 0 || invoice.whtCents > 0;
     const currencySymbol = invoice.currency === 'THB' ? '฿' : '$';
 
-    const data = {
-      branding,
-      org: { taxId: org?.taxId },
+    return {
       invoiceNumber: invoice.invoiceNumber,
-      issueDate: formatDate(invoice.issueDate),
-      dueDate: formatDate(invoice.dueDate),
-      customer: invoice.customer,
-      currencySymbol,
-      hasThaiTax,
-      lineItems: invoice.lineItems.map(li => ({
-        description: li.description,
-        containerNumber: li.containerNumber ?? '',
-        amount: (li.totalCents / 100).toFixed(2),
-      })),
-      subtotal: (invoice.subtotalCents / 100).toFixed(2),
-      vat: (invoice.vatCents / 100).toFixed(2),
-      wht: (invoice.whtCents / 100).toFixed(2),
-      netPayable: (invoice.netPayableCents / 100).toFixed(2),
-      netPayableBahtText: invoice.currency === 'THB' ? toBahtText(invoice.netPayableCents / 100) : null,
-      notes: invoice.notes,
-      paymentTermsDays: invoice.paymentTermsDays,
+      customerId: invoice.customerId,
+      data: {
+        branding,
+        org: { taxId: org?.taxId },
+        invoiceNumber: invoice.invoiceNumber,
+        issueDate: formatDate(invoice.issueDate),
+        dueDate: formatDate(invoice.dueDate),
+        customer: invoice.customer,
+        currencySymbol,
+        hasThaiTax,
+        lineItems: invoice.lineItems.map(li => ({
+          description: li.description,
+          containerNumber: li.containerNumber ?? '',
+          amount: (li.totalCents / 100).toFixed(2),
+        })),
+        subtotal: (invoice.subtotalCents / 100).toFixed(2),
+        vat: (invoice.vatCents / 100).toFixed(2),
+        wht: (invoice.whtCents / 100).toFixed(2),
+        netPayable: (invoice.netPayableCents / 100).toFixed(2),
+        netPayableBahtText: invoice.currency === 'THB' ? toBahtText(invoice.netPayableCents / 100) : null,
+        notes: invoice.notes,
+        paymentTermsDays: invoice.paymentTermsDays,
+      },
     };
+  }
+
+  async renderInvoiceHtml(invoiceId: string): Promise<string> {
+    const { invoiceNumber, data } = await this.buildInvoiceData(invoiceId);
+    const body = Handlebars.compile(defaultInvoiceTemplate)(data);
+    return this.wrapPrintableHtml(`ใบแจ้งหนี้ ${invoiceNumber}`, body);
+  }
+
+  async generateInvoicePdf(invoiceId: string, userId?: string) {
+    const { invoiceNumber, customerId, data } = await this.buildInvoiceData(invoiceId);
+    const invoice = { invoiceNumber, customerId };
 
     const html = Handlebars.compile(defaultInvoiceTemplate)(data);
     const pdfBytes = await this.htmlToPdf(html, `Invoice - ${invoice.invoiceNumber}`);
@@ -458,7 +476,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     return { id: doc.id, fileName };
   }
 
-  async generateWithholdingCertificatePdf(invoiceId: string, userId?: string) {
+  private async buildWithholdingCertData(invoiceId: string) {
     const invoice = await this.prisma.invoice.findUniqueOrThrow({
       where: { id: invoiceId },
       include: { withholdingCertificate: true, customer: true },
@@ -468,21 +486,37 @@ export class DocumentGenerationService implements IDocumentGenerationService {
 
     const branding = await this.loadBranding();
 
-    const data = {
-      branding,
+    return {
       certificateNumber: cert.certificateNumber,
-      issueDate: formatDate(cert.issueDate),
-      formLabel: cert.withholdingType === 'pnd3' ? 'ภ.ง.ด. 3' : 'ภ.ง.ด. 53',
-      payerName: cert.payerName,
-      payerTaxId: cert.payerTaxId,
-      payeeName: cert.payeeName,
-      payeeTaxId: cert.payeeTaxId,
-      incomeDescription: cert.incomeDescription,
-      invoiceNumber: invoice.invoiceNumber,
-      taxableAmount: (cert.taxableAmountCents / 100).toFixed(2),
-      witheldAmount: (cert.witheldAmountCents / 100).toFixed(2),
-      witheldAmountBahtText: toBahtText(cert.witheldAmountCents / 100),
+      customerId: invoice.customerId,
+      data: {
+        branding,
+        certificateNumber: cert.certificateNumber,
+        issueDate: formatDate(cert.issueDate),
+        formLabel: cert.withholdingType === 'pnd3' ? 'ภ.ง.ด. 3' : 'ภ.ง.ด. 53',
+        payerName: cert.payerName,
+        payerTaxId: cert.payerTaxId,
+        payeeName: cert.payeeName,
+        payeeTaxId: cert.payeeTaxId,
+        incomeDescription: cert.incomeDescription,
+        invoiceNumber: invoice.invoiceNumber,
+        taxableAmount: (cert.taxableAmountCents / 100).toFixed(2),
+        witheldAmount: (cert.witheldAmountCents / 100).toFixed(2),
+        witheldAmountBahtText: toBahtText(cert.witheldAmountCents / 100),
+      },
     };
+  }
+
+  async renderWithholdingCertificateHtml(invoiceId: string): Promise<string> {
+    const { certificateNumber, data } = await this.buildWithholdingCertData(invoiceId);
+    const body = Handlebars.compile(defaultWithholdingCertificateTemplate)(data);
+    return this.wrapPrintableHtml(`หนังสือรับรองหัก ณ ที่จ่าย ${certificateNumber}`, body);
+  }
+
+  async generateWithholdingCertificatePdf(invoiceId: string, userId?: string) {
+    const { certificateNumber, customerId, data } = await this.buildWithholdingCertData(invoiceId);
+    const invoice = { customerId };
+    const cert = { certificateNumber };
 
     const html = Handlebars.compile(defaultWithholdingCertificateTemplate)(data);
     const pdfBytes = await this.htmlToPdf(html, `Withholding Tax Certificate - ${cert.certificateNumber}`);
@@ -542,22 +576,20 @@ export class DocumentGenerationService implements IDocumentGenerationService {
   }
 
   /**
-   * Renders the job sheet as a standalone, print-styled HTML document instead
-   * of a pdf-lib PDF. pdf-lib's drawText has no complex-script shaping, so
-   * Thai combining vowels/tone marks misplace even with a correctly embedded
-   * font (see the PoC brief, section 6, "Thai PDFs"). Handing the same
-   * Handlebars-rendered markup to the browser's own text engine instead — via
-   * a real Thai web font and window.print() — renders correctly because the
-   * browser does the shaping pdf-lib skips.
+   * Wraps Handlebars-rendered markup as a standalone, print-styled HTML
+   * document instead of a pdf-lib PDF. pdf-lib's drawText has no
+   * complex-script shaping, so Thai combining vowels/tone marks misplace
+   * even with a correctly embedded font (see the PoC brief, section 6,
+   * "Thai PDFs"). Handing the same markup to the browser's own text engine
+   * instead — via a real Thai web font and window.print() — renders
+   * correctly because the browser does the shaping pdf-lib skips.
    */
-  async renderJobSheetHtml(shipmentId: string): Promise<string> {
-    const { data } = await this.buildJobSheetData(shipmentId);
-    const body = Handlebars.compile(defaultJobSheetTemplate)(data);
+  private wrapPrintableHtml(title: string, bodyHtml: string): string {
     return `<!doctype html>
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<title>${data.reference} — ใบสั่งงานคนขับ</title>
+<title>${title}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
@@ -590,9 +622,15 @@ export class DocumentGenerationService implements IDocumentGenerationService {
 </head>
 <body>
 <div class="print-bar"><button onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button></div>
-${body}
+${bodyHtml}
 </body>
 </html>`;
+  }
+
+  async renderJobSheetHtml(shipmentId: string): Promise<string> {
+    const { data } = await this.buildJobSheetData(shipmentId);
+    const body = Handlebars.compile(defaultJobSheetTemplate)(data);
+    return this.wrapPrintableHtml(`${data.reference} — ใบสั่งงานคนขับ`, body);
   }
 
   async generateJobSheetPdf(shipmentId: string, userId?: string) {
@@ -619,7 +657,7 @@ ${body}
     return { id: doc.id, fileName };
   }
 
-  async generateReceiptPdf(invoiceId: string, userId?: string) {
+  private async buildReceiptData(invoiceId: string) {
     const invoice = await this.prisma.invoice.findUniqueOrThrow({
       where: { id: invoiceId },
       include: { receipt: true, customer: true },
@@ -631,16 +669,32 @@ ${body}
     const org = await this.prisma.organization.findFirst({ select: { name: true } });
     const isThb = receipt.currency === 'THB';
 
-    const data = {
-      branding,
+    return {
       receiptNumber: receipt.receiptNumber,
-      issueDate: formatDate(receipt.issueDate),
-      invoiceNumber: invoice.invoiceNumber,
-      payeeName: org?.name ?? 'Ather TMS',
-      customerName: invoice.customer.name,
-      amount: `${isThb ? '฿' : '$'}${(receipt.amountCents / 100).toFixed(2)}`,
-      amountBahtText: isThb ? toBahtText(receipt.amountCents / 100) : null,
+      customerId: invoice.customerId,
+      data: {
+        branding,
+        receiptNumber: receipt.receiptNumber,
+        issueDate: formatDate(receipt.issueDate),
+        invoiceNumber: invoice.invoiceNumber,
+        payeeName: org?.name ?? 'Ather TMS',
+        customerName: invoice.customer.name,
+        amount: `${isThb ? '฿' : '$'}${(receipt.amountCents / 100).toFixed(2)}`,
+        amountBahtText: isThb ? toBahtText(receipt.amountCents / 100) : null,
+      },
     };
+  }
+
+  async renderReceiptHtml(invoiceId: string): Promise<string> {
+    const { receiptNumber, data } = await this.buildReceiptData(invoiceId);
+    const body = Handlebars.compile(defaultReceiptTemplate)(data);
+    return this.wrapPrintableHtml(`ใบเสร็จรับเงิน ${receiptNumber}`, body);
+  }
+
+  async generateReceiptPdf(invoiceId: string, userId?: string) {
+    const { receiptNumber, customerId, data } = await this.buildReceiptData(invoiceId);
+    const invoice = { customerId };
+    const receipt = { receiptNumber };
 
     const html = Handlebars.compile(defaultReceiptTemplate)(data);
     const pdfBytes = await this.htmlToPdf(html, `Receipt - ${receipt.receiptNumber}`);

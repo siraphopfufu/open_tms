@@ -171,23 +171,18 @@ export default function VNextFinanceInvoiceDetail() {
     setPaymentRef('');
   };
 
-  const downloadDocument = async (endpoint: string, actionKey: string) => {
+  // Opens print-styled HTML (correct Thai text shaping) rather than the
+  // pdf-lib PDF, which misplaces Thai combining marks — see backend route
+  // comment on /api/v1/documents/invoice-html and its siblings.
+  const openPrintableDocument = async (htmlEndpoint: string, actionKey: string) => {
     setActionLoading(actionKey);
     try {
-      const genRes = await fetch(`${API_URL}/api/v1/documents/${endpoint}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: id }),
-      });
-      const genJson = await genRes.json();
-      if (genJson.error) throw new Error(genJson.error);
-      const dlRes = await fetch(`${API_URL}/api/v1/documents/${genJson.data.id}/download`);
-      const blob = await dlRes.blob();
+      const res = await fetch(`${API_URL}/api/v1/documents/${htmlEndpoint}/${id}`);
+      if (!res.ok) throw new Error('สร้างเอกสารไม่สำเร็จ');
+      const html = await res.text();
+      const blob = new Blob([html], { type: 'text/html' });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = genJson.data.fileName;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      window.open(url, '_blank');
     } catch (e: any) { alert(e.message); }
     finally { setActionLoading(''); }
   };
@@ -253,7 +248,7 @@ export default function VNextFinanceInvoiceDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => downloadDocument('invoice-pdf', 'invoice-pdf')} disabled={!!actionLoading}>
+          <Button size="sm" variant="outline" onClick={() => openPrintableDocument('invoice-html', 'invoice-pdf')} disabled={!!actionLoading}>
             <Download className="h-4 w-4" />
             {actionLoading === 'invoice-pdf' ? 'กำลังเตรียม...' : 'ดาวน์โหลด PDF'}
           </Button>
@@ -450,7 +445,7 @@ export default function VNextFinanceInvoiceDetail() {
                         <dd className="font-mono tabular-nums">{formatMoney(i.withholdingCertificate.witheldAmountCents, i.currency)}</dd>
                       </div>
                     </dl>
-                    <Button size="sm" variant="outline" onClick={() => downloadDocument('withholding-certificate-pdf', 'wht-pdf')} disabled={!!actionLoading}>
+                    <Button size="sm" variant="outline" onClick={() => openPrintableDocument('withholding-certificate-html', 'wht-pdf')} disabled={!!actionLoading}>
                       <Download className="h-4 w-4" />
                       {actionLoading === 'wht-pdf' ? 'กำลังเตรียม...' : 'ดาวน์โหลด PDF'}
                     </Button>
@@ -494,7 +489,7 @@ export default function VNextFinanceInvoiceDetail() {
                       <dd className="font-mono tabular-nums">{formatMoney(i.receipt.amountCents, i.currency)}</dd>
                     </div>
                   </dl>
-                  <Button size="sm" variant="outline" onClick={() => downloadDocument('receipt-pdf', 'receipt-pdf')} disabled={!!actionLoading}>
+                  <Button size="sm" variant="outline" onClick={() => openPrintableDocument('receipt-html', 'receipt-pdf')} disabled={!!actionLoading}>
                     <Download className="h-4 w-4" />
                     {actionLoading === 'receipt-pdf' ? 'กำลังเตรียม...' : 'ดาวน์โหลด PDF'}
                   </Button>

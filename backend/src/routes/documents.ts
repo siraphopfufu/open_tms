@@ -491,6 +491,66 @@ export async function documentRoutes(server: FastifyInstance) {
     }
   });
 
+  // pdf-lib's drawText has no complex-script shaping, so Thai combining
+  // vowels/tone marks misplace even with a correct font embedded — see the
+  // comment on job-sheet-html below. Same fix, three more document types.
+  server.get('/api/v1/documents/invoice-html/:invoiceId', {
+    preHandler: requirePermission('documents:generate'),
+    schema: {
+      description: 'Render the invoice as print-styled HTML (correct Thai text shaping, unlike the pdf-lib invoice-pdf route)',
+      tags: ['Documents'],
+      params: { type: 'object', required: ['invoiceId'], properties: { invoiceId: { type: 'string' } } },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { invoiceId } = req.params as { invoiceId: string };
+    try {
+      const html = await docService.renderInvoiceHtml(invoiceId);
+      reply.type('text/html');
+      return html;
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
+  server.get('/api/v1/documents/withholding-certificate-html/:invoiceId', {
+    preHandler: requirePermission('documents:generate'),
+    schema: {
+      description: 'Render the withholding tax certificate (50 ทวิ) as print-styled HTML (correct Thai text shaping)',
+      tags: ['Documents'],
+      params: { type: 'object', required: ['invoiceId'], properties: { invoiceId: { type: 'string' } } },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { invoiceId } = req.params as { invoiceId: string };
+    try {
+      const html = await docService.renderWithholdingCertificateHtml(invoiceId);
+      reply.type('text/html');
+      return html;
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
+  server.get('/api/v1/documents/receipt-html/:invoiceId', {
+    preHandler: requirePermission('documents:generate'),
+    schema: {
+      description: 'Render the official receipt as print-styled HTML (correct Thai text shaping)',
+      tags: ['Documents'],
+      params: { type: 'object', required: ['invoiceId'], properties: { invoiceId: { type: 'string' } } },
+    },
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { invoiceId } = req.params as { invoiceId: string };
+    try {
+      const html = await docService.renderReceiptHtml(invoiceId);
+      reply.type('text/html');
+      return html;
+    } catch (err: any) {
+      reply.code(400);
+      return { data: null, error: err.message };
+    }
+  });
+
   server.post('/api/v1/documents/invoice-pdf', {
     preHandler: requirePermission('documents:generate'),
     schema: {
