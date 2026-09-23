@@ -334,6 +334,7 @@ function ContainerCard({ c, onDone }: { c: any; onDone: () => void }) {
   const [delivering, setDelivering] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [shareAccessCode, setShareAccessCode] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const createShareLink = async () => {
@@ -346,7 +347,11 @@ function ContainerCard({ c, onDone }: { c: any; onDone: () => void }) {
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
+      // The backend returns accessCode exactly once at creation and can never
+      // reveal it again — keep it in state alongside the URL so the operator
+      // can actually copy it to the customer.
       setShareUrl(json.data.url);
+      setShareAccessCode(json.data.accessCode);
     } catch (e: any) { alert(e.message); }
     finally { setSharing(false); }
   };
@@ -442,9 +447,19 @@ function ContainerCard({ c, onDone }: { c: any; onDone: () => void }) {
           {c.revenueCents > 0 && <span className="ml-auto text-xs text-muted-foreground">ค่าระวาง: {baht(c.revenueCents)}</span>}
         </div>
         {shareUrl && (
-          <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-2 text-xs">
-            <span className="truncate flex-1">{shareUrl}</span>
-            <Button size="sm" variant="ghost" onClick={() => navigator.clipboard?.writeText(shareUrl)}>คัดลอก</Button>
+          <div className="space-y-2 rounded-md border bg-muted/30 p-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="truncate flex-1">{shareUrl}</span>
+              <Button size="sm" variant="ghost" onClick={() => navigator.clipboard?.writeText(shareUrl)}>คัดลอกลิงก์</Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="truncate flex-1 font-mono font-semibold">{shareAccessCode}</span>
+              <Button size="sm" variant="ghost" onClick={() => navigator.clipboard?.writeText(shareAccessCode)}>คัดลอกรหัส</Button>
+            </div>
+            <div className="flex items-start gap-1.5 text-warning">
+              <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>รหัสนี้จะแสดงให้เห็นเพียงครั้งเดียว กรุณาคัดลอกลิงก์และรหัสส่งให้ลูกค้าตอนนี้ ระบบจะไม่สามารถแสดงรหัสนี้ซ้ำได้อีก</span>
+            </div>
           </div>
         )}
       </CardContent>
