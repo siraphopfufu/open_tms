@@ -1,0 +1,13 @@
+# Keep build contexts to source only. Host node_modules carry platform-native
+# binaries (Prisma engines, esbuild) that break inside the Linux image, and
+# local .env files must never be baked into an image.
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.*
+.git
+.claude
+e2e/test-results
+e2e/playwright-report
+www

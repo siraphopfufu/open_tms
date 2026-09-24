@@ -1,0 +1,18 @@
+{
+  "name": "@ather-tms/e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser end-to-end tests, run against the Docker stack in docker-compose.yml",
+  "scripts": {
+    "stack:up": "docker compose up -d --build --wait && npm run stack:seed",
+    "stack:seed": "docker compose exec -T backend npx tsx src/scripts/comprehensive-seed.ts",
+    "stack:down": "docker compose down -v",
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.6.2"
+  }
+}
