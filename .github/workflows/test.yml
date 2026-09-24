@@ -1,5 +1,9 @@
 name: Tests
 
+# test + build + e2e run on every PR and push to main. On main, deploy then
+# waits for approval in the "production" environment and ships to
+# https://tms.ather-ai.com. See docs/DEPLOYMENT_PIPELINE.md.
+
 on:
   push:
     branches: [main]
@@ -9,7 +13,11 @@ on:
 
 concurrency:
   group: tests-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on main part-way through: it may be deploying.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -100,6 +108,18 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
 
+      # public.ecr.aws rate-limits anonymous pulls per IP, and runner IPs are
+      # shared, so an occasional "toomanyrequests" is expected: retry.
+      - name: Pull service images
+        working-directory: e2e
+        run: |
+          for attempt in 1 2 3 4 5; do
+            docker compose pull --ignore-buildable && exit 0
+            echo "Pull failed (attempt $attempt), retrying in $((attempt * 15))s"
+            sleep $((attempt * 15))
+          done
+          exit 1
+
       - name: Start stack and seed demo data
         working-directory: e2e
         run: |
@@ -135,3 +155,109 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report
           retention-days: 14
+  deploy:
+    # Only after a merge to main has passed every check.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, build, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # The approval gate. The "production" environment requires a reviewer, so
+    # this job pauses and GitHub emails the reviewer a "Review deployments"
+    # link. Nothing below runs, and no AWS credentials are issued, until
+    # someone clicks Approve. Rejecting it, or leaving it for 30 days, skips
+    # the deploy.
+    environment:
+      name: production
+      url: https://tms.ather-ai.com
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write   # short-lived OIDC token for the AWS role; no stored keys
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Same Dockerfiles and build cache as the e2e job: these are the images
+      # that were just tested. Tagged with the commit SHA, which is what ECS
+      # runs, and also with latest, which the CloudFormation task definitions
+      # reference.
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/ather-tms-backend:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/ather-tms-backend:latest
+          cache-from: type=gha,scope=backend
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/ather-tms-frontend:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/ather-tms-frontend:latest
+          cache-from: type=gha,scope=frontend
+
+      # Backend first: it runs DB migrations on start, and the frontend must
+      # never be ahead of the API it talks to.
+      - name: Deploy backend
+        id: backend
+        run: scripts/deploy/ecs-deploy.sh ather-tms-cluster ather-tms-backend backend "${{ steps.ecr.outputs.registry }}/ather-tms-backend:${{ github.sha }}"
+
+      - name: Deploy frontend
+        id: frontend
+        run: scripts/deploy/ecs-deploy.sh ather-tms-cluster ather-tms-frontend frontend "${{ steps.ecr.outputs.registry }}/ather-tms-frontend:${{ github.sha }}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Smoke test production
+        id: smoke
+        working-directory: e2e
+        env:
+          E2E_BASE_URL: https://tms.ather-ai.com
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test smoke
+
+      # If the new version is live but broken, put the previous one back.
+      # (A version that never becomes healthy is already rolled back by the
+      # ECS deployment circuit breaker.) DB migrations are not reversed: keep
+      # them backwards-compatible (add columns, don't drop or rename).
+      - name: Roll back on failed smoke test
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: |
+          scripts/deploy/ecs-rollback.sh ather-tms-cluster ather-tms-frontend "${{ steps.frontend.outputs.previous }}"
+          scripts/deploy/ecs-rollback.sh ather-tms-cluster ather-tms-backend "${{ steps.backend.outputs.previous }}"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy ${{ job.status }}"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Backend task definition: ${{ steps.backend.outputs.current || 'n/a' }}"
+            echo "- Frontend task definition: ${{ steps.frontend.outputs.current || 'n/a' }}"
+          } >> "$GITHUB_STEP_SUMMARY"

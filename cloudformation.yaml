@@ -40,6 +40,16 @@ Parameters:
     Default: arn:aws:acm:us-east-1:283972468366:certificate/990e2dd9-d07c-4e4c-8e79-8be6355ef5e9
     Description: ACM certificate ARN (us-east-1, DNS-validated) covering DomainName
 
+  GitHubOIDCProviderArn:
+    Type: String
+    Default: ""
+    Description: >
+      Existing token.actions.githubusercontent.com OIDC provider in this
+      account. Leave empty to create one (an account can only have one).
+
+Conditions:
+  CreateGitHubOIDCProvider: !Equals [!Ref GitHubOIDCProviderArn, ""]
+
 # ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
@@ -354,7 +364,9 @@ Resources:
               awslogs-region: !Ref "AWS::Region"
               awslogs-stream-prefix: backend
           HealthCheck:
-            Command: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+            # 127.0.0.1, not localhost: in the Alpine image localhost resolves
+            # to ::1 and the server listens on IPv4 only.
+            Command: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
             Interval: 30
             Timeout: 5
             Retries: 3
@@ -507,6 +519,16 @@ Resources:
       TaskDefinition: !Ref BackendTaskDefinition
       DesiredCount: 1
       LaunchType: FARGATE
+      DeploymentConfiguration:
+        # Keep the old task serving until the new one is healthy; if new
+        # tasks never get healthy, ECS rolls back on its own.
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      # Migrations run on container start.
+      HealthCheckGracePeriodSeconds: 120
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
@@ -530,6 +552,14 @@ Resources:
       TaskDefinition: !Ref FrontendTaskDefinition
       DesiredCount: 1
       LaunchType: FARGATE
+      DeploymentConfiguration:
+        # Keep the old task serving until the new one is healthy; if new
+        # tasks never get healthy, ECS rolls back on its own.
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
@@ -543,10 +573,79 @@ Resources:
           ContainerPort: 80
           TargetGroupArn: !Ref FrontendTargetGroup
 
+  # ---- GitHub Actions deploy (see docs/DEPLOYMENT_PIPELINE.md) ----------
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateGitHubOIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  # Assumable only by a job in siraphopfufu/open_tms running in the
+  # "production" environment, i.e. only after a reviewer approved it. PRs,
+  # forks and other branches can't get these credentials.
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${EnvironmentName}-github-deploy"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateGitHubOIDCProvider
+                - !Ref GitHubOIDCProvider
+                - !Ref GitHubOIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: repo:siraphopfufu/open_tms:environment:production
+      Policies:
+        - PolicyName: deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                Resource:
+                  - !GetAtt BackendRepo.Arn
+                  - !GetAtt FrontendRepo.Arn
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource:
+                  - !Ref BackendService
+                  - !Ref FrontendService
+              - Effect: Allow   # these ECS actions don't support resource scoping
+                Action:
+                  - ecs:DescribeTaskDefinition
+                  - ecs:RegisterTaskDefinition
+                Resource: "*"
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt ECSTaskExecutionRole.Arn
+
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
 Outputs:
+  GitHubDeployRoleArn:
+    Description: Set as the AWS_DEPLOY_ROLE_ARN variable on the GitHub repo
+    Value: !GetAtt GitHubDeployRole.Arn
+
   ApplicationURL:
     Description: Ather TMS frontend URL
     Value: !Sub "http://${ALB.DNSName}"
