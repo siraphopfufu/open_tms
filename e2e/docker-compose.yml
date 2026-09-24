@@ -1,0 +1,61 @@
+# Throwaway stack for the E2E suite, built from the production Dockerfiles so
+# CI exercises the same images that get deployed. Like production, the app and
+# API share one origin behind a path-routing proxy (the ALB's job in AWS).
+# Port 18080 is offset from the dev stack (3001/5173/8080) so both can run.
+name: ather-tms-e2e
+
+services:
+  db:
+    image: public.ecr.aws/docker/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: tms
+      POSTGRES_PASSWORD: tms
+      POSTGRES_DB: tms
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tms"]
+      interval: 2s
+      retries: 30
+
+  backend:
+    image: ${BACKEND_IMAGE:-ather-tms-backend:e2e}
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgres://tms:tms@db:5432/tms
+      NODE_ENV: production
+      PORT: "3001"
+      JWT_SECRET: e2e-only-not-a-real-secret
+      CORS_ORIGINS: http://localhost:18080
+      PUBLIC_URL: http://localhost:18080
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
+      interval: 3s
+      retries: 40
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ather-tms-frontend:e2e}
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    environment:
+      VITE_API_URL: http://localhost:18080
+    depends_on:
+      - backend
+
+  proxy:
+    image: public.ecr.aws/nginx/nginx:1.27-alpine
+    volumes:
+      - ./alb-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    ports:
+      - "18080:80"

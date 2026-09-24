@@ -86,12 +86,15 @@ export class DocumentGenerationService implements IDocumentGenerationService {
    * Load organization branding for document templates.
    * Returns org name, primary color, and logo URL (if available).
    */
-  private async loadBranding(): Promise<{
+  private async loadBranding(orgId?: string): Promise<{
     orgName: string;
     primaryColor: string;
     logoUrl: string | null;
   }> {
+    // TODO: every caller should pass orgId; unscoped, this picks whichever
+    // org Postgres returns first. The Thai tax documents already do.
     const org = await this.prisma.organization.findFirst({
+      ...(orgId && { where: { id: orgId } }),
       select: { name: true, themeConfig: true, logoStorageKey: true },
     });
     const themeConfig = org?.themeConfig as Record<string, string> | null;
@@ -419,8 +422,10 @@ export class DocumentGenerationService implements IDocumentGenerationService {
       include: { lineItems: true, customer: true },
     });
 
-    const branding = await this.loadBranding();
-    const org = await this.prisma.organization.findFirst({ select: { taxId: true } });
+    const branding = await this.loadBranding(invoice.orgId);
+    // The seller's tax ID printed on a tax invoice must be the invoicing
+    // org's own, never another tenant's.
+    const org = await this.prisma.organization.findUnique({ where: { id: invoice.orgId }, select: { taxId: true } });
 
     const hasThaiTax = invoice.vatCents > 0 || invoice.whtCents > 0;
     const currencySymbol = invoice.currency === 'THB' ? '฿' : '$';
@@ -492,7 +497,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const cert = invoice.withholdingCertificate;
     if (!cert) throw new Error('No withholding tax certificate has been issued for this invoice yet');
 
-    const branding = await this.loadBranding();
+    const branding = await this.loadBranding(invoice.orgId);
 
     return {
       certificateNumber: cert.certificateNumber,
@@ -673,8 +678,8 @@ ${bodyHtml}
     const receipt = invoice.receipt;
     if (!receipt) throw new Error('No receipt has been issued for this invoice yet');
 
-    const branding = await this.loadBranding();
-    const org = await this.prisma.organization.findFirst({ select: { name: true } });
+    const branding = await this.loadBranding(invoice.orgId);
+    const org = await this.prisma.organization.findUnique({ where: { id: invoice.orgId }, select: { name: true } });
     const isThb = receipt.currency === 'THB';
 
     return {
