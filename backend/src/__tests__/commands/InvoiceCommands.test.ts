@@ -46,6 +46,9 @@ const mockTx = {
   invoiceLineItem: {
     findMany: jest.fn().mockResolvedValue([{ shipmentId: 'ship-1' }]),
   },
+  shipment: {
+    findMany: jest.fn().mockResolvedValue([{ id: 'ship-1', shippingContainer: { containerNumber: 'MSKU1234565' } }]),
+  },
   payment: {
     create: jest.fn().mockResolvedValue({ id: 'pay-1', amountCents: 150000 }),
   },
@@ -86,6 +89,58 @@ describe('Invoice Command Handlers', () => {
           totalCents: 150000,
         })
       );
+    });
+
+    it('leaves tax at zero for non-THB invoices', async () => {
+      const { bus } = mockEventBus();
+      await new CreateInvoiceCommandHandler(mockPrisma, bus).execute(
+        createTestCommand(CREATE_INVOICE, { customerId: 'cust-1', shipmentIds: ['ship-1'] })
+      );
+
+      const data = mockTx.invoice.create.mock.calls[0][0].data;
+      expect(data).toEqual(expect.objectContaining({
+        subtotalCents: 150000, vatCents: 0, whtCents: 0, totalCents: 150000, balanceCents: 150000,
+      }));
+    });
+
+    it('applies 7% VAT and 1% WHT to THB invoices, with the balance at the net amount transferred', async () => {
+      const thbTx = {
+        ...mockTx,
+        charge: { ...mockTx.charge, findMany: jest.fn().mockResolvedValue([{ ...mockCharge, currency: 'THB' }]) },
+      };
+      const prisma = {
+        $transaction: jest.fn((fn: Function) => fn(thbTx)),
+        domainEventLog: { findFirst: jest.fn().mockResolvedValue(null) },
+      } as any;
+
+      const { bus } = mockEventBus();
+      const result = await new CreateInvoiceCommandHandler(prisma, bus).execute(
+        createTestCommand(CREATE_INVOICE, { customerId: 'cust-1', shipmentIds: ['ship-1'] })
+      );
+
+      expect(result.success).toBe(true);
+      const data = thbTx.invoice.create.mock.calls[0][0].data;
+      // 1,500.00 THB: VAT 105.00, WHT 15.00, net 1,590.00
+      expect(data).toEqual(expect.objectContaining({
+        currency: 'THB',
+        subtotalCents: 150000,
+        vatCents: 10500,
+        taxCents: 10500,
+        whtCents: 1500,
+        netPayableCents: 159000,
+        totalCents: 159000,
+        balanceCents: 159000,
+      }));
+    });
+
+    it('copies the container number onto each line item', async () => {
+      const { bus } = mockEventBus();
+      await new CreateInvoiceCommandHandler(mockPrisma, bus).execute(
+        createTestCommand(CREATE_INVOICE, { customerId: 'cust-1', shipmentIds: ['ship-1'] })
+      );
+
+      const lineItems = mockTx.invoice.create.mock.calls[0][0].data.lineItems.create;
+      expect(lineItems).toEqual([expect.objectContaining({ chargeId: 'charge-1', containerNumber: 'MSKU1234565' })]);
     });
 
     it('fails when no shipments provided', async () => {
