@@ -602,7 +602,10 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: repo:siraphopfufu/open_tms:environment:production
+                # The repo uses GitHub's immutable OIDC subject, which pins the
+                # owner and repo IDs (@74309311, @1366505912) as well as the
+                # names, so a renamed or re-created repo can't match.
+                token.actions.githubusercontent.com:sub: repo:siraphopfufu@74309311/open_tms@1366505912:environment:production
       Policies:
         - PolicyName: deploy
           PolicyDocument:

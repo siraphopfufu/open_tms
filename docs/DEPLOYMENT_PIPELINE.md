@@ -6,7 +6,7 @@ Every change reaches production the same way:
 2. **Merge to main.** The same three checks run again on the merged code.
 3. **Approval.** The `deploy` job targets the `production` GitHub environment. It pauses there, and GitHub emails the required reviewers a **Review deployments** link. Approve from the web or the GitHub mobile app. Reject, or leave it for 30 days, and nothing ships.
 4. **Deploy** (`.github/workflows/test.yml`, job `deploy`):
-   - Assumes the `ather-tms-github-deploy` AWS role over OIDC. There are no stored AWS keys, and the role only trusts jobs running in this repo's `production` environment.
+   - Assumes the `ather-tms-github-deploy` AWS role over OIDC. There are no stored AWS keys, and the role only trusts jobs running in this repo's `production` environment. The trust policy matches GitHub's immutable subject format (`repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:production`), which this repo has enabled.
    - Builds the backend and frontend images from the same Dockerfiles and cache the `e2e` job tested, tags them with the commit SHA (and `latest`), and pushes them to ECR.
    - Rolls the backend service, then the frontend, onto the new images with `scripts/deploy/ecs-deploy.sh`, and waits for each to become stable.
    - Runs the read-only smoke suite (`e2e/tests/smoke.spec.ts`) against https://tms.ather-ai.com.
