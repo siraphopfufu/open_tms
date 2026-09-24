@@ -2,6 +2,7 @@ import { DocumentGenerationService } from '../../services/DocumentGenerationServ
 
 const mockShipment = {
   id: 'ship-1',
+  orgId: 'org-1',
   reference: 'SH-001',
   customerId: 'cust-1',
   pickupDate: new Date('2026-01-01'),
@@ -21,7 +22,7 @@ function makePrisma(shipmentOverrides: Partial<typeof mockShipment> = {}) {
       findUniqueOrThrow: jest.fn().mockResolvedValue(shipment),
     },
     organization: {
-      findFirst: jest.fn().mockResolvedValue({ name: 'Ather TMS', mcNumber: 'MC-123', themeConfig: null, logoStorageKey: null }),
+      findUnique: jest.fn().mockResolvedValue({ name: 'Ather TMS', mcNumber: 'MC-123', themeConfig: null, logoStorageKey: null }),
     },
   } as any;
 }

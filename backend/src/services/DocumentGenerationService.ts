@@ -86,15 +86,17 @@ export class DocumentGenerationService implements IDocumentGenerationService {
    * Load organization branding for document templates.
    * Returns org name, primary color, and logo URL (if available).
    */
-  private async loadBranding(orgId?: string): Promise<{
+  /**
+   * Branding of the org that owns the document. Always scoped by orgId: an
+   * unscoped lookup returns whichever tenant Postgres happens to list first.
+   */
+  private async loadBranding(orgId: string): Promise<{
     orgName: string;
     primaryColor: string;
     logoUrl: string | null;
   }> {
-    // TODO: every caller should pass orgId; unscoped, this picks whichever
-    // org Postgres returns first. The Thai tax documents already do.
-    const org = await this.prisma.organization.findFirst({
-      ...(orgId && { where: { id: orgId } }),
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
       select: { name: true, themeConfig: true, logoStorageKey: true },
     });
     const themeConfig = org?.themeConfig as Record<string, string> | null;
@@ -129,15 +131,13 @@ export class DocumentGenerationService implements IDocumentGenerationService {
       },
     });
 
-    // Generate BOL number
-    const org = await this.prisma.organization.findFirst();
-    const seqNum = (org?.bolSequenceNumber ?? 0) + 1;
-    if (org) {
-      await this.prisma.organization.update({
-        where: { id: org.id },
-        data: { bolSequenceNumber: seqNum },
-      });
-    }
+    // Claim the next BOL number for the shipment's own org in one atomic
+    // increment, so two BOLs generated at once can't read the same value.
+    const { bolSequenceNumber: seqNum } = await this.prisma.organization.update({
+      where: { id: shipment.orgId },
+      data: { bolSequenceNumber: { increment: 1 } },
+      select: { bolSequenceNumber: true },
+    });
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const bolNumber = `BOL-${dateStr}-${String(seqNum).padStart(4, '0')}`;
@@ -147,7 +147,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const allLineItems = orders.flatMap(o => o.lineItems);
     const allUnits = orders.flatMap(o => o.trackableUnits);
     const totalWeight = allLineItems.reduce((sum, li) => sum + (li.weight ?? 0), 0);
-    const branding = await this.loadBranding();
+    const branding = await this.loadBranding(shipment.orgId);
 
     const data = {
       branding,
@@ -193,7 +193,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const html = Handlebars.compile(htmlTemplate)(data);
 
     // Generate PDF
-    const pdfBytes = await this.htmlToPdf(html, `Bill of Lading - ${bolNumber}`);
+    const pdfBytes = await this.htmlToPdf(html, `Bill of Lading - ${bolNumber}`, branding.orgName);
 
     const fileName = `${bolNumber}.pdf`;
     const buffer = Buffer.from(pdfBytes);
@@ -230,7 +230,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     });
 
     const shipment = order.orderShipments[0]?.shipment;
-    const branding = await this.loadBranding();
+    const branding = await this.loadBranding(order.orgId);
 
     const data = {
       branding,
@@ -250,7 +250,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const htmlTemplate = await this.getTemplateHtml('label', templateId);
     const html = Handlebars.compile(htmlTemplate)(data);
 
-    const pdfBytes = await this.htmlToPdf(html, `Labels - ${order.orderNumber}`);
+    const pdfBytes = await this.htmlToPdf(html, `Labels - ${order.orderNumber}`, branding.orgName);
 
     const fileName = `Labels-${order.orderNumber}.pdf`;
     const buffer = Buffer.from(pdfBytes);
@@ -289,7 +289,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const orders = shipment.orderShipments.map(os => os.order);
     const allLineItems = orders.flatMap(o => o.lineItems);
     const totalWeight = allLineItems.reduce((sum, li) => sum + (li.weight ?? 0), 0);
-    const branding = await this.loadBranding();
+    const branding = await this.loadBranding(shipment.orgId);
 
     const data = {
       branding,
@@ -315,7 +315,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const htmlTemplate = await this.getTemplateHtml('customs', templateId);
     const html = Handlebars.compile(htmlTemplate)(data);
 
-    const pdfBytes = await this.htmlToPdf(html, `Customs Form - ${shipment.reference}`);
+    const pdfBytes = await this.htmlToPdf(html, `Customs Form - ${shipment.reference}`, branding.orgName);
 
     const fileName = `Customs-${shipment.reference}.pdf`;
     const buffer = Buffer.from(pdfBytes);
@@ -360,8 +360,9 @@ export class DocumentGenerationService implements IDocumentGenerationService {
       throw new Error('Shipment has no approved cost charge — award a tender or approve a cost charge before generating a rate confirmation');
     }
 
-    const branding = await this.loadBranding();
-    const org = await this.prisma.organization.findFirst({
+    const branding = await this.loadBranding(shipment.orgId);
+    const org = await this.prisma.organization.findUnique({
+      where: { id: shipment.orgId },
       select: { mcNumber: true },
     });
 
@@ -395,7 +396,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     };
 
     const html = Handlebars.compile(defaultRateConfirmationTemplate)(data);
-    const pdfBytes = await this.htmlToPdf(html, `Rate Confirmation - ${shipment.reference}`);
+    const pdfBytes = await this.htmlToPdf(html, `Rate Confirmation - ${shipment.reference}`, branding.orgName);
 
     const fileName = `RateConfirmation-${shipment.reference}.pdf`;
     const buffer = Buffer.from(pdfBytes);
@@ -469,7 +470,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const invoice = { invoiceNumber, customerId };
 
     const html = Handlebars.compile(defaultInvoiceTemplate)(data);
-    const pdfBytes = await this.htmlToPdf(html, `Invoice - ${invoice.invoiceNumber}`);
+    const pdfBytes = await this.htmlToPdf(html, `Invoice - ${invoice.invoiceNumber}`, data.branding.orgName);
 
     const fileName = `Invoice-${invoice.invoiceNumber}.pdf`;
     const buffer = Buffer.from(pdfBytes);
@@ -532,7 +533,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     const cert = { certificateNumber };
 
     const html = Handlebars.compile(defaultWithholdingCertificateTemplate)(data);
-    const pdfBytes = await this.htmlToPdf(html, `Withholding Tax Certificate - ${cert.certificateNumber}`);
+    const pdfBytes = await this.htmlToPdf(html, `Withholding Tax Certificate - ${cert.certificateNumber}`, data.branding.orgName);
 
     const fileName = `WHT-Certificate-${cert.certificateNumber}.pdf`;
     const buffer = Buffer.from(pdfBytes);
@@ -565,7 +566,7 @@ export class DocumentGenerationService implements IDocumentGenerationService {
     });
 
     const load = shipment.loads[0];
-    const branding = await this.loadBranding();
+    const branding = await this.loadBranding(shipment.orgId);
 
     return {
       reference: shipment.reference,
@@ -651,7 +652,7 @@ ${bodyHtml}
     const shipment = { reference };
 
     const html = Handlebars.compile(defaultJobSheetTemplate)(data);
-    const pdfBytes = await this.htmlToPdf(html, `Job Sheet - ${shipment.reference}`);
+    const pdfBytes = await this.htmlToPdf(html, `Job Sheet - ${shipment.reference}`, data.branding.orgName);
 
     const fileName = `Job-Sheet-${shipment.reference}.pdf`;
     const buffer = Buffer.from(pdfBytes);
@@ -710,7 +711,7 @@ ${bodyHtml}
     const receipt = { receiptNumber };
 
     const html = Handlebars.compile(defaultReceiptTemplate)(data);
-    const pdfBytes = await this.htmlToPdf(html, `Receipt - ${receipt.receiptNumber}`);
+    const pdfBytes = await this.htmlToPdf(html, `Receipt - ${receipt.receiptNumber}`, data.branding.orgName);
 
     const fileName = `Receipt-${receipt.receiptNumber}.pdf`;
     const buffer = Buffer.from(pdfBytes);
@@ -786,16 +787,11 @@ ${bodyHtml}
    * Parses block-level HTML (headings, tables, paragraphs) and renders with
    * proper column-aligned tables, inline bold, <br/> line breaks, and word wrapping.
    */
-  async htmlToPdf(html: string, title: string): Promise<Uint8Array> {
+  async htmlToPdf(html: string, title: string, orgName?: string): Promise<Uint8Array> {
     const pdfDoc = await PDFDocument.create();
     pdfDoc.setTitle(title);
-    // Use org name for document creator metadata
-    let creatorName = 'Ather TMS';
-    try {
-      const org = await this.prisma.organization.findFirst({ select: { name: true } });
-      if (org?.name && org.name !== 'Default Organization') creatorName = org.name;
-    } catch { /* use fallback */ }
-    pdfDoc.setCreator(creatorName);
+    // Creator metadata is the owning org's name, passed in from its branding.
+    pdfDoc.setCreator(orgName && orgName !== 'Default Organization' ? orgName : 'Ather TMS');
 
     // Documents with Thai content (invoices, withholding tax certificates) get
     // Noto Sans Thai instead of Helvetica — the standard PDF fonts have no
