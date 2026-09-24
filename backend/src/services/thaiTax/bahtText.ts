@@ -39,11 +39,12 @@ function integerToThaiWords(n: number): string {
         if (digit === 0) continue;
 
         if (placeFromRight === 0) {
-          // Ones place: "เอ็ด" instead of "หนึ่ง" whenever anything precedes it
-          // — a higher digit in this group, or a non-zero earlier group. Only
-          // the last group's ones digit is a true "ones" position; in an
-          // earlier group this digit is itself worth a multiple of 10^6+.
-          if (digit === 1 && isLastGroup && (digitsStr.length > 1 || hasPrecedingNonZero)) {
+          // Ones place: "เอ็ด" instead of "หนึ่ง" whenever a higher digit in
+          // this group precedes it (11 -> สิบเอ็ด, and likewise 11,000,000 ->
+          // สิบเอ็ดล้าน). In the last group a non-zero earlier group counts
+          // too (1,000,001 -> หนึ่งล้านเอ็ด), but a bare leading 1 in an
+          // earlier group stays "หนึ่ง" (1,000,000 -> หนึ่งล้าน).
+          if (digit === 1 && (digitsStr.length > 1 || (isLastGroup && hasPrecedingNonZero))) {
             out += 'เอ็ด';
           } else {
             out += DIGITS[digit];

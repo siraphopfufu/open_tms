@@ -1,8 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import Handlebars from 'handlebars';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -46,8 +45,17 @@ const THAI_RANGE = /[฀-๿]/;
 let thaiFontBytesCache: Buffer | null = null;
 function loadThaiFontBytes(): Buffer {
   if (!thaiFontBytesCache) {
-    const here = dirname(fileURLToPath(import.meta.url));
-    thaiFontBytesCache = readFileSync(join(here, '../../assets/fonts/NotoSansThai.ttf'));
+    // Resolved from the working directory rather than import.meta.url, which
+    // ts-jest (CommonJS) can't compile. The backend runs from backend/ in dev,
+    // Docker and Jest; the second candidate covers running from the repo root.
+    const candidates = [
+      process.env.THAI_FONT_PATH,
+      join(process.cwd(), 'assets/fonts/NotoSansThai.ttf'),
+      join(process.cwd(), 'backend/assets/fonts/NotoSansThai.ttf'),
+    ].filter((p): p is string => !!p);
+    const fontPath = candidates.find(p => existsSync(p));
+    if (!fontPath) throw new Error(`Thai font not found; looked in: ${candidates.join(', ')}`);
+    thaiFontBytesCache = readFileSync(fontPath);
   }
   return thaiFontBytesCache;
 }
