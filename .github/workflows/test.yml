@@ -108,6 +108,18 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
 
+      # public.ecr.aws rate-limits anonymous pulls per IP, and runner IPs are
+      # shared, so an occasional "toomanyrequests" is expected: retry.
+      - name: Pull service images
+        working-directory: e2e
+        run: |
+          for attempt in 1 2 3 4 5; do
+            docker compose pull --ignore-buildable && exit 0
+            echo "Pull failed (attempt $attempt), retrying in $((attempt * 15))s"
+            sleep $((attempt * 15))
+          done
+          exit 1
+
       - name: Start stack and seed demo data
         working-directory: e2e
         run: |
