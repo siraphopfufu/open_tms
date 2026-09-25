@@ -219,6 +219,49 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      # ECS reads the backend's secrets at task start, so the running
+      # container gets their values without them ever appearing in the task
+      # definition.
+      Policies:
+        - PolicyName: read-app-secrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref DatabaseUrlSecret
+                  - !Ref JwtSecret
+                  - !Ref CredentialsEncryptionKeySecret
+
+  # ---- Application secrets (see docs/DEPLOYMENT_PIPELINE.md) -------------
+  # Phase A of #9: same values the task definition used to carry in plain
+  # text, so moving them changes nothing for running sessions or the DB.
+  # Rotating them is a separate, deliberate step.
+  DatabaseUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${EnvironmentName}/database-url"
+      Description: Prisma DATABASE_URL for the backend
+      SecretString: !Sub "postgresql://tmsadmin:${DBPassword}@${Database.Endpoint.Address}:5432/tms"
+
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${EnvironmentName}/jwt-secret"
+      Description: HMAC key for session JWTs. Changing it logs everyone out.
+      SecretString: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
+
+  # New: production never had one, so saving carrier credentials failed
+  # closed. Nothing is encrypted with it yet, so generating it is safe.
+  CredentialsEncryptionKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${EnvironmentName}/credentials-encryption-key"
+      Description: Key for encrypting stored carrier/integration credentials (secretVault)
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
 
   CodeBuildRole:
     Type: AWS::IAM::Role
@@ -347,16 +390,19 @@ Resources:
             - ContainerPort: 3001
               Protocol: tcp
           Environment:
-            - Name: DATABASE_URL
-              Value: !Sub "postgresql://tmsadmin:${DBPassword}@${Database.Endpoint.Address}:5432/tms"
             - Name: NODE_ENV
               Value: production
             - Name: PORT
               Value: "3001"
-            - Name: JWT_SECRET
-              Value: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
             - Name: PUBLIC_URL
               Value: !Sub "https://${DomainName}"
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrlSecret
+            - Name: JWT_SECRET
+              ValueFrom: !Ref JwtSecret
+            - Name: CREDENTIALS_ENCRYPTION_KEY
+              ValueFrom: !Ref CredentialsEncryptionKeySecret
           LogConfiguration:
             LogDriver: awslogs
             Options:

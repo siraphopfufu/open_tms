@@ -40,6 +40,18 @@ Or revert the commit on `main` and approve the resulting deploy.
 
 The CodeBuild project in the stack still works as a manual fallback. It pushes `latest`, which the CloudFormation task definitions reference.
 
+## Secrets
+
+The backend's secrets live in Secrets Manager, not in the task definition:
+
+| Secret | Env var | Notes |
+|---|---|---|
+| `ather-tms/database-url` | `DATABASE_URL` | Built from the stack's `DBPassword` parameter. |
+| `ather-tms/jwt-secret` | `JWT_SECRET` | Changing it logs every user out. |
+| `ather-tms/credentials-encryption-key` | `CREDENTIALS_ENCRYPTION_KEY` | Encrypts stored carrier/integration credentials. Once any are stored, changing it makes them unreadable. |
+
+The task definition holds only their ARNs (`secrets[].valueFrom`), and ECS injects the values at task start using the task execution role. The deploy script copies the `secrets` block unchanged, so deploys need no secret access.
+
 ## Public logs
 
-This repository is public, so Actions logs are too. The ECS task definitions contain `DATABASE_URL` and `JWT_SECRET`, and the deploy scripts never print them. Keep it that way, or better, move those values to Secrets Manager.
+This repository is public, so Actions logs are too. Task definitions contain secret ARNs, not values, but the deploy scripts still never print them.
