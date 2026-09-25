@@ -46,11 +46,14 @@ The backend's secrets live in Secrets Manager, not in the task definition:
 
 | Secret | Env var | Notes |
 |---|---|---|
-| `ather-tms/database-url` | `DATABASE_URL` | Built from the stack's `DBPassword` parameter. |
-| `ather-tms/jwt-secret` | `JWT_SECRET` | Changing it logs every user out. |
+| `ather-tms/db-master` | none | Generated RDS master password. RDS reads it through a CloudFormation dynamic reference. |
+| `ather-tms/database-url` | `DATABASE_URL` | Built from `db-master` and the RDS endpoint. |
+| `ather-tms/jwt-secret` | `JWT_SECRET` | Generated. Changing it logs every user out. |
 | `ather-tms/credentials-encryption-key` | `CREDENTIALS_ENCRYPTION_KEY` | Encrypts stored carrier/integration credentials. Once any are stored, changing it makes them unreadable. |
 
 The task definition holds only their ARNs (`secrets[].valueFrom`), and ECS injects the values at task start using the task execution role. The deploy script copies the `secrets` block unchanged, so deploys need no secret access.
+
+Tasks read secrets only when they start. After changing a value, bump `SECRETS_REVISION` in the backend task definition so the stack update rolls the service.
 
 ## Public logs
 
