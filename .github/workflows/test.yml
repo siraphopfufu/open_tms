@@ -83,8 +83,26 @@ jobs:
     # throwaway Postgres. See e2e/README.md.
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write   # OIDC login for image pulls
     steps:
       - uses: actions/checkout@v4
+
+      # Log in to public.ecr.aws (higher pull limits than anonymous). Skipped
+      # until the AWS_CI_PULL_ROLE_ARN variable exists; pulls are anonymous then.
+      - name: AWS credentials for image pulls
+        if: vars.AWS_CI_PULL_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_PULL_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Log in to Amazon ECR Public
+        if: vars.AWS_CI_PULL_ROLE_ARN != ''
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
 
       - uses: docker/setup-buildx-action@v3
 
@@ -187,6 +205,11 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
         with:
           mask-password: true
+
+      - name: Log in to Amazon ECR Public
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
 
       - uses: docker/setup-buildx-action@v3
 
