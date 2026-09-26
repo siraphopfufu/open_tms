@@ -30,8 +30,14 @@ services:
       JWT_SECRET: e2e-only-not-a-real-secret
       CORS_ORIGINS: http://localhost:18080
       PUBLIC_URL: http://localhost:18080
+      # Shipment assistant against the scripted mock below, never a real model.
+      ASSISTANT_PROVIDER: anthropic
+      ANTHROPIC_API_KEY: e2e-mock-not-a-real-key
+      ANTHROPIC_BASE_URL: http://mock-claude:8080
     depends_on:
       db:
+        condition: service_healthy
+      mock-claude:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
@@ -47,6 +53,17 @@ services:
       VITE_API_URL: http://localhost:18080
     depends_on:
       - backend
+
+  mock-claude:
+    image: public.ecr.aws/docker/library/node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./mock-claude.ts:/app/mock-claude.ts:ro
+    command: ["node", "--experimental-strip-types", "--no-warnings", "mock-claude.ts"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
+      interval: 2s
+      retries: 15
 
   proxy:
     image: public.ecr.aws/nginx/nginx:1.27-alpine

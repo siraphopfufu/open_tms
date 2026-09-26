@@ -12,9 +12,11 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { registerOrgScope } from '../auth/orgScopeMiddleware.js';
 import { requirePermission } from '../middleware/jwtAuth.js';
 import { validateContainerNumber } from '../services/shippingContainers/iso6346.js';
+import { JobReadRepository } from '../repositories/JobReadRepository.js';
 
 export async function jobRoutes(server: FastifyInstance) {
   await registerOrgScope(server);
+  const jobs = new JobReadRepository(server.prisma);
 
   // ─── List jobs (งานวันนี้) ──────────────────────────────────────────────────
 
@@ -23,46 +25,7 @@ export async function jobRoutes(server: FastifyInstance) {
   }, async (req: FastifyRequest, reply: FastifyReply) => {
     const orgId = req.orgId!;
     try {
-      const orders = await server.prisma.order.findMany({
-        where: { orgId, status: { not: 'cancelled' } },
-        select: {
-          id: true,
-          orderNumber: true,
-          poNumber: true,
-          status: true,
-          createdAt: true,
-          customer: { select: { name: true } },
-          origin: { select: { name: true, city: true } },
-          destination: { select: { name: true, city: true } },
-          orderShipments: {
-            select: {
-              shipment: {
-                select: {
-                  id: true,
-                  status: true,
-                  shippingContainer: { select: { containerNumber: true, sizeType: true } },
-                },
-              },
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      });
-
-      const rows = orders.map(o => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        bookingNumber: o.poNumber,
-        status: o.status,
-        createdAt: o.createdAt,
-        customerName: o.customer.name,
-        originName: o.origin?.city ?? o.origin?.name ?? null,
-        destinationName: o.destination?.city ?? o.destination?.name ?? null,
-        containerCount: o.orderShipments.length,
-        containers: o.orderShipments.map(os => os.shipment.shippingContainer?.containerNumber || os.shipment.shippingContainer?.sizeType || 'ตู้').join(', '),
-      }));
-
+      const rows = await jobs.listJobs(orgId);
       return { data: rows, error: null };
     } catch (err: any) {
       reply.code(500);
@@ -241,112 +204,12 @@ export async function jobRoutes(server: FastifyInstance) {
     const orgId = req.orgId!;
     const { id } = req.params as { id: string };
     try {
-      const order = await server.prisma.order.findFirst({
-        where: { id, orgId },
-        select: {
-          id: true,
-          orderNumber: true,
-          poNumber: true,
-          status: true,
-          createdAt: true,
-          customerId: true,
-          customer: { select: { id: true, name: true } },
-          origin: { select: { id: true, name: true, city: true } },
-          destination: { select: { id: true, name: true, city: true } },
-          orderShipments: { select: { shipmentId: true } },
-        },
-      });
-      if (!order) {
+      const job = await jobs.getJobDetail(orgId, id);
+      if (!job) {
         reply.code(404);
         return { data: null, error: 'Job not found' };
       }
-
-      const shipmentIds = order.orderShipments.map(os => os.shipmentId);
-      const shipments = await server.prisma.shipment.findMany({
-        where: { id: { in: shipmentIds } },
-        select: {
-          id: true,
-          reference: true,
-          status: true,
-          direction: true,
-          shippingContainer: true,
-          loads: { include: { vehicle: { include: { carrier: true } }, driver: true } },
-          driverAdvance: { include: { driver: true } },
-          fuelTransactions: true,
-          tripSettlement: true,
-        },
-        orderBy: { reference: 'asc' },
-      });
-
-      const [charges, attachmentCounts, lineItems] = await Promise.all([
-        server.prisma.charge.findMany({ where: { shipmentId: { in: shipmentIds }, chargeCategory: 'revenue', status: { in: ['approved', 'invoiced'] } } }),
-        server.prisma.attachment.findMany({ where: { entityType: 'shipment', entityId: { in: shipmentIds } }, select: { entityId: true, id: true, fileName: true } }),
-        server.prisma.invoiceLineItem.findMany({ where: { shipmentId: { in: shipmentIds } }, select: { shipmentId: true, invoice: { select: { id: true, invoiceNumber: true, status: true } } } }),
-      ]);
-
-      const revenueByShipment = new Map<string, number>();
-      for (const c of charges) revenueByShipment.set(c.shipmentId!, (revenueByShipment.get(c.shipmentId!) ?? 0) + c.amountCents);
-      const attachmentsByShipment = new Map<string, any[]>();
-      for (const a of attachmentCounts) {
-        const list = attachmentsByShipment.get(a.entityId) ?? [];
-        list.push(a);
-        attachmentsByShipment.set(a.entityId, list);
-      }
-      const invoiceByShipment = new Map(lineItems.map(li => [li.shipmentId as string, li.invoice]));
-
-      const containers = shipments.map(s => {
-        const load = s.loads[0];
-        const revenueCents = revenueByShipment.get(s.id) ?? 0;
-        const actualFuelCostCents = s.fuelTransactions.reduce((sum: number, t: any) => sum + t.totalCostCents, 0);
-        const actualLiters = s.fuelTransactions.reduce((sum: number, t: any) => sum + t.liters, 0);
-        const settlement = s.tripSettlement;
-        const totalActualCostCents = settlement?.totalActualCostCents ?? (actualFuelCostCents + (s.driverAdvance?.tollEstimateCents ?? 0) + (s.driverAdvance?.allowanceCents ?? 0));
-        const grossMarginCents = revenueCents - totalActualCostCents;
-        const attachments = attachmentsByShipment.get(s.id) ?? [];
-        const invoice = invoiceByShipment.get(s.id);
-
-        return {
-          shipmentId: s.id,
-          reference: s.reference,
-          status: s.status,
-          direction: s.direction,
-          container: s.shippingContainer,
-          vehicle: load?.vehicle ? { id: load.vehicle.id, plate: load.vehicle.plate, carrierName: load.vehicle.carrier?.name, isOwnFleet: load.vehicle.carrier?.isOwnFleet } : null,
-          trailerPlate: load?.trailerPlate ?? null,
-          driver: load?.driver ? { id: load.driver.id, name: load.driver.name } : null,
-          advance: s.driverAdvance ? {
-            id: s.driverAdvance.id,
-            totalAdvanceCents: s.driverAdvance.totalAdvanceCents,
-            status: s.driverAdvance.status,
-          } : null,
-          expectedLiters: settlement ? settlement.distanceKm / settlement.vehicleKmPerLiter : null,
-          actualLiters,
-          isOverBenchmark: settlement?.isOverBenchmark ?? null,
-          netSettlementCents: settlement?.netSettlementCents ?? null,
-          revenueCents,
-          totalActualCostCents,
-          grossMarginCents,
-          attachmentCount: attachments.length,
-          podReceived: attachments.length > 0,
-          invoiceNumber: invoice?.invoiceNumber ?? null,
-          invoiceStatus: invoice?.status ?? null,
-        };
-      });
-
-      return {
-        data: {
-          id: order.id,
-          orderNumber: order.orderNumber,
-          bookingNumber: order.poNumber,
-          status: order.status,
-          createdAt: order.createdAt,
-          customer: order.customer,
-          origin: order.origin,
-          destination: order.destination,
-          containers,
-        },
-        error: null,
-      };
+      return { data: job, error: null };
     } catch (err: any) {
       reply.code(500);
       return { data: null, error: err.message };
