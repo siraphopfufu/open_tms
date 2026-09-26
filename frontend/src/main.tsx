@@ -80,6 +80,7 @@ import VNextSlaDashboard from './vnext-design/VNextSlaDashboard';
 import VNextSlaPolicies from './vnext-design/VNextSlaPolicies';
 import VNextLocationOps from './vnext-design/VNextLocationOps';
 import VNextAgentDecisions from './vnext-design/VNextAgentDecisions';
+import VNextAssistant from './vnext-design/VNextAssistant';
 import VNextAgentDecisionDetail from './vnext-design/VNextAgentDecisionDetail';
 import VNextLlmSettings from './vnext-design/VNextLlmSettings';
 import VNextIotVendors from './vnext-design/VNextIotVendors';
@@ -363,6 +364,7 @@ root.render(
           <Route path="carrier-bidding" element={<VNextCarrierBidding />} />
 
           {/* Agent Decisions */}
+          <Route path="assistant" element={<VNextAssistant />} />
           <Route path="agent-decisions" element={<VNextAgentDecisions />} />
           <Route path="agent-decisions/:id" element={<VNextAgentDecisionDetail />} />
 

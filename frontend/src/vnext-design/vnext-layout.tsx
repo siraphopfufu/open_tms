@@ -355,7 +355,7 @@ const DEMO_APPS: AppDef[] = [
         { to: '/customers', icon: Users, label: 'ลูกค้าและสถานที่' },
         { to: '/reports', icon: BarChart3, label: 'สรุปภาพรวม' },
         { to: '/map', icon: MapIcon, label: 'แผนที่ติดตามรถ' },
-        { to: '/agent-decisions', icon: Bot, label: 'ผู้ช่วย AI' },
+        { to: '/assistant', icon: Bot, label: 'ผู้ช่วย AI' },
       ]},
     ],
   },

@@ -1,11 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
+import { login } from './support/login';
 
 // The Boonchai PoC flow end to end: open a two-container job, dispatch both
 // (own fleet + a new subcontractor), advance and settle container 1, deliver
 // it, attach the delivery document, share it with the customer, then bill it.
 // Mutates data, so it only runs against the throwaway stack (see README).
 
-const ADMIN = { email: 'admin@meridian-tms.demo', password: 'Password1!' };
 
 // Container 1 revenue 18,000.00 THB -> VAT 7% 1,260.00, WHT 1% 180.00, net 19,080.00
 const EXPECTED_INVOICE = {
@@ -15,13 +15,6 @@ const EXPECTED_INVOICE = {
   net: '฿19,080.00',
 };
 
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.getByPlaceholder('you@company.com').fill(ADMIN.email);
-  await page.getByPlaceholder('Enter your password').fill(ADMIN.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL(url => new URL(url).pathname === '/');
-}
 
 async function pickOption(page: Page, trigger: string, option: string | null) {
   await page.getByText(trigger).first().click();
