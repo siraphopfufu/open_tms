@@ -31,7 +31,7 @@ const MAX_MODEL_CALLS = 6;
 
 const SYSTEM_PROMPT = `You are ผู้ช่วย AI, the assistant inside Ather TMS for a Thai container-drayage company. Dispatchers, billing staff and managers ask you about their jobs (งาน), containers (ตู้/เที่ยว), trucks, drivers, driver advances (เงินทดรอง), trip settlement (เคลียร์บิล), delivery documents (ใบส่งของ/POD) and billing (วางบิล).
 
-Answer only from what the tools return. Call tools to look things up; never guess a status, amount, plate, name or date. If the tools return nothing relevant, say so plainly and suggest what the user could search for instead. You can only read data: if asked to change something (dispatch a truck, create an invoice, settle a trip), explain where in the app to do it.
+Answer only from what the tools return. Call tools to look things up; never guess a status, amount, plate, name or date. When you need several lookups that don't depend on each other, request them together in one turn rather than one at a time. If the tools return nothing relevant, say so plainly and suggest what the user could search for instead. You can only read data: if asked to change something (dispatch a truck, create an invoice, settle a trip), explain where in the app to do it.
 
 Reply in the language the user wrote in (usually Thai). Keep answers short and scannable: lead with the direct answer, then a compact list when there are several items. Amounts from tools are already in baht; format them like ฿18,000.00. Mention the order number or container number for each job you refer to so the user can open it.`;
 
@@ -62,7 +62,7 @@ export class ShipmentAssistantService {
         model: this.model.model,
         max_tokens: 8000,
         thinking: { type: 'adaptive' },
-        output_config: { effort: 'medium' },
+        output_config: { effort: this.model.effort },
         system: [
           // Explicit breakpoint: the stable prompt + tool list cache across questions.
           { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
@@ -90,22 +90,25 @@ export class ShipmentAssistantService {
       }
 
       messages.push({ role: 'assistant', content: response.content });
-      const results: Anthropic.ToolResultBlockParam[] = [];
-      for (const use of toolUses) {
-        const outcome = await this.tools.execute(orgId, use.name, use.input).catch(() => ({
+      // Tools are independent reads, so run one turn's calls concurrently.
+      const outcomes = await Promise.all(toolUses.map(use =>
+        this.tools.execute(orgId, use.name, use.input).catch(() => ({
           result: { error: 'Lookup failed' },
           isError: true,
-          jobRefs: [],
-        }));
+          jobRefs: [] as { jobId: string; orderNumber: string }[],
+        })),
+      ));
+      const results: Anthropic.ToolResultBlockParam[] = toolUses.map((use, i) => {
+        const outcome = outcomes[i];
         toolCalls.push({ name: use.name, input: use.input, isError: outcome.isError });
         for (const ref of outcome.jobRefs) jobRefs.set(ref.jobId, ref.orderNumber);
-        results.push({
+        return {
           type: 'tool_result',
           tool_use_id: use.id,
           content: JSON.stringify(outcome.result),
           ...(outcome.isError && { is_error: true }),
-        });
-      }
+        };
+      });
       // All results for one assistant turn go back in a single user message.
       messages.push({ role: 'user', content: results });
     }

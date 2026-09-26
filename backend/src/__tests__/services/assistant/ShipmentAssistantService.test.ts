@@ -22,7 +22,7 @@ function setup(responses: any[]) {
   };
   const commandBus = { dispatch: jest.fn().mockResolvedValue({ success: true, data: { id: 'dec-1' }, events: [] }) };
   const service = new ShipmentAssistantService(
-    { client: { messages: { create } } as any, provider: 'bedrock', model: 'anthropic.claude-opus-5' },
+    { client: { messages: { create } } as any, provider: 'bedrock', model: 'anthropic.claude-opus-5', effort: 'low' },
     tools as any,
     commandBus as any,
     () => new Date('2026-09-26T01:00:00Z'),
@@ -69,9 +69,39 @@ describe('ShipmentAssistantService', () => {
 
     const req = create.mock.calls[0][0];
     expect(req.model).toBe('anthropic.claude-opus-5');
+    expect(req.output_config).toEqual({ effort: 'low' });
     expect(req.system[0].cache_control).toEqual({ type: 'ephemeral' });
     expect(req.system[1].text).toContain('2026-09-26');
     expect(req.tools.map((t: any) => t.name)).toContain('get_job');
+  });
+
+  it('runs one turn’s tool calls concurrently, keeping results in call order', async () => {
+    const both = {
+      stop_reason: 'tool_use',
+      usage,
+      content: [
+        { type: 'tool_use', id: 'slow', name: 'search_jobs', input: {} },
+        { type: 'tool_use', id: 'fast', name: 'list_unsettled_advances', input: {} },
+      ],
+    };
+    const { create, tools, service } = setup([both, final('done')]);
+    let started = 0;
+    let release!: () => void;
+    const gate = new Promise<void>(r => { release = r; });
+    tools.execute.mockImplementation(async (_org: string, name: string) => {
+      started++;
+      if (name === 'search_jobs') await gate; // the slow call waits until both have started
+      return { result: { name }, isError: false, jobRefs: [] };
+    });
+
+    const pending = service.chat(ORG, 'user-1', [{ role: 'user', content: 'x' }]);
+    await new Promise(r => setImmediate(r));
+    expect(started).toBe(2); // second call began while the first was still running
+    release();
+    await pending;
+
+    const results = create.mock.calls[1][0].messages[2].content;
+    expect(results.map((b: any) => b.tool_use_id)).toEqual(['slow', 'fast']);
   });
 
   it('turns a tool that throws into an error result instead of failing the chat', async () => {
