@@ -39,6 +39,33 @@ deterministic Issue Engine, not as a creator - see `ISSUE_ENGINE.md`.
 **Subscribed events:** `shipment.exception`, `sla.breached`, `cargo.misdrop_detected`,
 `cargo.missing_at_stop`, `cargo.left_on_vehicle`, `cold_chain.excursion_detected`
 
+## Shipment Assistant (ผู้ช่วย AI)
+
+A read-only chat assistant at `/assistant` (`POST /api/v1/assistant/chat`). Claude answers a
+dispatcher's question by calling tools that read the org's jobs; it cannot change anything.
+
+- **Tools** (`services/assistant/assistantTools.ts`): `search_jobs`, `get_job`,
+  `list_ready_to_invoice`, `list_unsettled_advances`, `revenue_summary`. The executor always passes
+  `req.orgId`; no tool input can select an org. Inputs are validated with zod, and amounts are
+  returned in baht.
+- **Loop** (`services/assistant/ShipmentAssistantService.ts`): at most 6 model calls per question,
+  adaptive thinking at `medium` effort, and a system prompt cached with an explicit breakpoint. A
+  tool that throws becomes an error result, never a failed request.
+- **Logging:** every answered question is an `AgentDecision` with `agentType: shipment_assistant` and
+  `actionType: answer_question`, so it shows in the decision history tab.
+- **Limits:** 20 requests per user per minute, at most 20 turns of history, 2,000 characters per
+  message.
+
+**Enable** with `ASSISTANT_PROVIDER`:
+
+| Value | Endpoint | Auth | Default model (`ASSISTANT_MODEL` overrides) |
+|---|---|---|---|
+| `bedrock` | Claude in Amazon Bedrock (`bedrock-mantle.{region}.api.aws`) | AWS credential chain; the ECS task role in production needs `bedrock-mantle:CreateInference` | `anthropic.claude-opus-5` |
+| `anthropic` | Claude API | `ANTHROPIC_API_KEY` (and `ANTHROPIC_BASE_URL` to point at a mock) | `claude-opus-5` |
+
+With neither set, `/api/v1/assistant/status` reports `enabled: false` and the page says so. The E2E
+stack runs it against `e2e/mock-claude.ts`, a scripted Messages API, so CI never calls a real model.
+
 ## Configurable Agent Prompts
 
 Agent behaviour is configurable per-org via `AgentConfig` + versioned prompts

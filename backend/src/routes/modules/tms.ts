@@ -28,6 +28,7 @@ import { tripSettlementRoutes } from '../tripSettlement.js';
 import { fleetAssignmentRoutes } from '../fleetAssignment.js';
 import { unbilledLedgerRoutes } from '../unbilledLedger.js';
 import { jobRoutes } from '../jobs.js';
+import { assistantRoutes } from '../assistant.js';
 import { fleetComplianceRoutes } from '../fleetCompliance.js';
 import { shipmentShareLinkRoutes } from '../shipmentShareLinks.js';
 import { shipmentTypeRoutes } from '../shipmentTypes.js';
@@ -105,6 +106,7 @@ export async function registerTmsAuthenticatedRoutes(app: FastifyInstance): Prom
   await app.register(fleetAssignmentRoutes);
   await app.register(unbilledLedgerRoutes);
   await app.register(jobRoutes);
+  await app.register(assistantRoutes);
   await app.register(fleetComplianceRoutes);
   await app.register(shipmentShareLinkRoutes);
   await app.register(shipmentTypeRoutes);
