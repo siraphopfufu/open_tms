@@ -48,8 +48,9 @@ dispatcher's question by calling tools that read the org's jobs; it cannot chang
   `list_ready_to_invoice`, `list_unsettled_advances`, `revenue_summary`. The executor always passes
   `req.orgId`; no tool input can select an org. Inputs are validated with zod, and amounts are
   returned in baht.
-- **Loop** (`services/assistant/ShipmentAssistantService.ts`): at most 6 model calls per question,
-  adaptive thinking at `medium` effort, and a system prompt cached with an explicit breakpoint. A
+- **Loop** (`services/assistant/ShipmentAssistantService.ts`): at most 6 model calls per question, one turn's tool calls run concurrently,
+  adaptive thinking at `ASSISTANT_EFFORT` (default `low`: measured 15–17s vs 20–21s at `medium` on
+  real Bedrock with the same answer quality), and a system prompt cached with an explicit breakpoint. A
   tool that throws becomes an error result, never a failed request.
 - **Logging:** every answered question is an `AgentDecision` with `agentType: shipment_assistant` and
   `actionType: answer_question`, so it shows in the decision history tab.

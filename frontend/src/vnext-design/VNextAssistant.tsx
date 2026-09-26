@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { ChatMarkdown } from '@/components/ChatMarkdown';
 import VNextAgentDecisions from './VNextAgentDecisions';
 
 interface ChatMessage {
@@ -122,7 +123,9 @@ function AssistantChat() {
                 m.failed && 'border border-destructive/30 bg-destructive/10 text-destructive',
               )}
             >
-              <div className="whitespace-pre-wrap">{m.content}</div>
+              {m.role === 'assistant' && !m.failed
+                ? <ChatMarkdown text={m.content} />
+                : <div className="whitespace-pre-wrap">{m.content}</div>}
               {!!m.jobRefs?.length && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {m.jobRefs.map(ref => (

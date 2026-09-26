@@ -11,10 +11,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AnthropicBedrockMantle } from '@anthropic-ai/bedrock-sdk';
 
+export type AssistantEffort = 'low' | 'medium' | 'high';
+
 export interface AssistantModel {
   client: { messages: Anthropic['messages'] };
   provider: 'bedrock' | 'anthropic';
   model: string;
+  /** ASSISTANT_EFFORT; lookups-and-summarise chat rarely needs more than low. */
+  effort: AssistantEffort;
+}
+
+function effortFrom(env: NodeJS.ProcessEnv): AssistantEffort {
+  const e = env.ASSISTANT_EFFORT;
+  return e === 'medium' || e === 'high' ? e : 'low';
 }
 
 export function createAssistantModel(env: NodeJS.ProcessEnv = process.env): AssistantModel | null {
@@ -25,6 +34,7 @@ export function createAssistantModel(env: NodeJS.ProcessEnv = process.env): Assi
       client: new AnthropicBedrockMantle({ awsRegion: env.ASSISTANT_AWS_REGION || env.AWS_REGION }),
       provider,
       model: env.ASSISTANT_MODEL || 'anthropic.claude-opus-5',
+      effort: effortFrom(env),
     };
   }
 
@@ -36,6 +46,7 @@ export function createAssistantModel(env: NodeJS.ProcessEnv = process.env): Assi
       }),
       provider,
       model: env.ASSISTANT_MODEL || 'claude-opus-5',
+      effort: effortFrom(env),
     };
   }
 

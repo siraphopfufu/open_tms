@@ -173,10 +173,35 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report
           retention-days: 14
-  deploy:
-    # Only after a merge to main has passed every check.
+  changes:
+    # Decides whether a push to main changes what runs in production. The
+    # approval gate fires when the deploy job starts, so this has to be a
+    # separate job for docs- or stack-template-only merges to skip it.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, build, e2e]
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          echo "$changed"
+          # cloudformation.yaml is applied by hand as a reviewed change set,
+          # not by this pipeline, so it doesn't need an image deploy either.
+          app=$(echo "$changed" | grep -vE '^(docs/|\.claude/)|\.md$|^cloudformation\.yaml$' | grep -c . || true)
+          if [ -z "$changed" ] || [ "$app" -gt 0 ]; then echo "app=true" >> "$GITHUB_OUTPUT"; else echo "app=false" >> "$GITHUB_OUTPUT"; fi
+
+  deploy:
+    # Only after a merge to main has passed every check, and only when it
+    # changes something that runs in production.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.app == 'true'
+    needs: [test, build, e2e, changes]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # The approval gate. The "production" environment requires a reviewer, so
